@@ -12,8 +12,8 @@
 
     <!-- Tab buttons -->
     <div style="display:flex;gap:8px;margin-bottom:24px;">
-      <button class="btn" id="tab-login" onclick="showTab('login')">Sign In</button>
-      <button class="btn btn-secondary" id="tab-register" onclick="showTab('register')">Register as Teacher</button>
+      <button class="btn" id="tab-login">Sign In</button>
+      <button class="btn btn-secondary" id="tab-register">Register as Teacher</button>
     </div>
 
     <!-- Login form -->
@@ -62,17 +62,21 @@
     getUser().then(async user => {
       if (user) {
         const profile = await getProfile(user.id)
+        if (!profile) return // registered but no profile yet, stay on page
         if (profile.role === 'teacher') window.location.href = '/teacher/dashboard.html'
         else window.location.href = '/student/dashboard.html'
       }
     })
 
-    window.showTab = function(tab) {
+    function showTab(tab) {
       document.getElementById('login-form').classList.toggle('hidden', tab !== 'login')
       document.getElementById('register-form').classList.toggle('hidden', tab !== 'register')
       document.getElementById('tab-login').classList.toggle('btn-secondary', tab !== 'login')
       document.getElementById('tab-register').classList.toggle('btn-secondary', tab !== 'register')
     }
+
+    document.getElementById('tab-login').addEventListener('click', () => showTab('login'))
+    document.getElementById('tab-register').addEventListener('click', () => showTab('register'))
 
     // Login
     document.getElementById('login-form').addEventListener('submit', async (e) => {
@@ -83,6 +87,7 @@
       try {
         const { user } = await login(email, password)
         const profile = await getProfile(user.id)
+        if (!profile) throw new Error('No profile found. Please register first.')
         if (profile.role === 'teacher') window.location.href = '/teacher/dashboard.html'
         else window.location.href = '/student/dashboard.html'
       } catch (err) {
