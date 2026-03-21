@@ -351,7 +351,7 @@
       const toAdd = checked.filter(id => !assignedIds.includes(id))
 
       if (toAdd.length > 0) {
-        await supabase.from('assignments').insert(toAdd.map(student_id => ({ test_id: currentTestId, student_id })))
+        await supabase.from('assignments').insert(toAdd.map(student_id => ({ test_id: currentTestId, student_id, school_id: school.id })))
       }
 
       const msg = document.getElementById('assign-msg')

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Take Test</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav>
+    <div>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="results.html">My Results</a>
+    </div>
+    <button class="btn btn-secondary" id="logout-btn" style="width:auto;padding:6px 16px;">Sign Out</button>
+  </nav>
+
+  <div class="page" style="max-width:700px;">
+    <div id="loading">Loading test...</div>
+    <div id="test-container" class="hidden">
+      <h2 id="test-title"></h2>
+      <p id="test-description" style="color:#666;margin-bottom:24px;"></p>
+      <form id="test-form"></form>
+      <button class="btn" id="submit-btn" style="margin-top:24px;">Submit Test</button>
+      <p id="submit-error" class="error hidden"></p>
+    </div>
+    <div id="results-container" class="hidden">
+      <div class="card" style="text-align:center;">
+        <div style="font-size:3rem;font-weight:700;color:#4f8ef7;" id="score-display"></div>
+        <div style="font-size:1.2rem;margin-top:8px;">Your Score</div>
+      </div>
+      <h3 style="margin:24px 0 16px;">Review</h3>
+      <div id="review-list"></div>
+      <a href="dashboard.html" class="btn" style="display:block;text-align:center;text-decoration:none;margin-top:24px;">Back to Dashboard</a>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth, logout } from '../js/auth.js'
+    import { supabase } from '../js/supabase.js'
+
+    const { user } = await requireAuth('student')
+    document.getElementById('logout-btn').addEventListener('click', logout)
+
+    const params = new URLSearchParams(window.location.search)
+    const assignmentId = params.get('assignment')
+
+    if (!assignmentId) {
+      window.location.href = '/student/dashboard.html'
+    }
+
+    // Load assignment and test
+    const { data: assignment } = await supabase
+      .from('assignments')
+      .select('id, test_id, tests(id, title, description)')
+      .eq('id', assignmentId)
+      .eq('student_id', user.id)
+      .maybeSingle()
+
+    if (!assignment) {
+      window.location.href = '/student/dashboard.html'
+    }
+
+    // Check if already submitted
+    const { data: existing } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', assignmentId)
+      .limit(1)
+
+    if (existing && existing.length > 0) {
+      showResults()
+    } else {
+      loadTest()
+    }
+
+    async function loadTest() {
+      const { data: questions } = await supabase
+        .from('questions')
+        .select('id, question_text, position, choices(id, choice_text)')
+        .eq('test_id', assignment.tests.id)
+        .order('position')
+
+      document.getElementById('test-title').textContent = assignment.tests.title
+      if (assignment.tests.description) {
+        document.getElementById('test-description').textContent = assignment.tests.description
+      }
+
+      const form = document.getElementById('test-form')
+      form.innerHTML = questions.map((q, i) => `
+        <div class="card" style="margin-bottom:16px;">
+          <p style="font-weight:600;margin-bottom:12px;">Q${i + 1}: ${q.question_text}</p>
+          ${q.choices.map(c => `
+            <label style="display:flex;align-items:center;gap:10px;margin-bottom:8px;cursor:pointer;">
+              <input type="radio" name="q_${q.id}" value="${c.id}" required>
+              <span>${c.choice_text}</span>
+            </label>
+          `).join('')}
+        </div>
+      `).join('')
+
+      document.getElementById('loading').classList.add('hidden')
+      document.getElementById('test-container').classList.remove('hidden')
+
+      document.getElementById('submit-btn').addEventListener('click', async () => {
+        const errorMsg = document.getElementById('submit-error')
+        const answers = []
+
+        for (const q of questions) {
+          const selected = form.querySelector(`input[name="q_${q.id}"]:checked`)
+          if (!selected) {
+            errorMsg.textContent = 'Please answer all questions before submitting.'
+            errorMsg.classList.remove('hidden')
+            return
+          }
+          answers.push({ assignment_id: assignmentId, question_id: q.id, choice_id: selected.value })
+        }
+
+        const { error } = await supabase.from('submissions').insert(answers)
+        if (error) {
+          errorMsg.textContent = error.message
+          errorMsg.classList.remove('hidden')
+          return
+        }
+
+        showResults()
+      })
+    }
+
+    async function showResults() {
+      document.getElementById('loading').classList.add('hidden')
+      document.getElementById('test-container').classList.add('hidden')
+
+      const { data: questions } = await supabase
+        .from('questions')
+        .select('id, question_text, position, choices(id, choice_text, is_correct)')
+        .eq('test_id', assignment.tests.id)
+        .order('position')
+
+      const { data: submissions } = await supabase
+        .from('submissions')
+        .select('question_id, choice_id')
+        .eq('assignment_id', assignmentId)
+
+      let correct = 0
+      const reviewHtml = questions.map((q, i) => {
+        const sub = submissions?.find(s => s.question_id === q.id)
+        const chosen = q.choices.find(c => c.id === sub?.choice_id)
+        const correctChoice = q.choices.find(c => c.is_correct)
+        const isCorrect = chosen?.is_correct
+
+        if (isCorrect) correct++
+
+        return `
+          <div class="card" style="margin-bottom:12px;border-left:4px solid ${isCorrect ? '#48bb78' : '#fc8181'};">
+            <p style="font-weight:600;margin-bottom:8px;">Q${i + 1}: ${q.question_text}</p>
+            <p>Your answer: <span style="color:${isCorrect ? '#48bb78' : '#fc8181'}">${chosen?.choice_text || 'Not answered'}</span></p>
+            ${!isCorrect ? `<p>Correct answer: <span style="color:#48bb78">${correctChoice?.choice_text}</span></p>` : ''}
+          </div>
+        `
+      }).join('')
+
+      const pct = Math.round((correct / questions.length) * 100)
+      document.getElementById('score-display').textContent = `${pct}% (${correct}/${questions.length})`
+      document.getElementById('review-list').innerHTML = reviewHtml
+      document.getElementById('results-container').classList.remove('hidden')
+    }
+  </script>
+</body>
+</html>
