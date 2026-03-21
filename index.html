@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homeschool Tests</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Homeschool Tests</h1>
+    <p class="subtitle">Sign in to your account</p>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="you@example.com" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Password" required>
+      </div>
+      <button type="submit" class="btn">Sign In</button>
+      <p id="error-msg" class="error hidden"></p>
+    </form>
+  </div>
+
+  <script type="module">
+    import { login, getUser, getProfile } from './js/auth.js'
+
+    // If already logged in, redirect
+    getUser().then(async user => {
+      if (user) {
+        const profile = await getProfile(user.id)
+        if (profile.role === 'teacher') window.location.href = '/teacher/dashboard.html'
+        else window.location.href = '/student/dashboard.html'
+      }
+    })
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const email = document.getElementById('email').value
+      const password = document.getElementById('password').value
+      const errorMsg = document.getElementById('error-msg')
+
+      try {
+        const { user } = await login(email, password)
+        const profile = await getProfile(user.id)
+        if (profile.role === 'teacher') window.location.href = '/teacher/dashboard.html'
+        else window.location.href = '/student/dashboard.html'
+      } catch (err) {
+        errorMsg.textContent = err.message
+        errorMsg.classList.remove('hidden')
+      }
+    })
+  </script>
+</body>
+</html>

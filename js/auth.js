@@ -1,0 +1,41 @@
+import { supabase } from './supabase.js'
+
+export async function login(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) throw error
+  return data
+}
+
+export async function logout() {
+  await supabase.auth.signOut()
+  window.location.href = '/index.html'
+}
+
+export async function getUser() {
+  const { data } = await supabase.auth.getUser()
+  return data.user
+}
+
+export async function getProfile(userId) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function requireAuth(role) {
+  const user = await getUser()
+  if (!user) {
+    window.location.href = '/index.html'
+    return null
+  }
+  const profile = await getProfile(user.id)
+  if (role && profile.role !== role) {
+    window.location.href = '/index.html'
+    return null
+  }
+  return { user, profile }
+}
