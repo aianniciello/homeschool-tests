@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Tests</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav>
+    <div>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="students.html">Students</a>
+      <a href="tests.html">My Tests</a>
+      <a href="catalogue.html">Catalogue</a>
+      <a href="results.html">Results</a>
+    </div>
+    <button class="btn btn-secondary" id="logout-btn" style="width:auto;padding:6px 16px;">Sign Out</button>
+  </nav>
+
+  <div class="page">
+
+    <!-- Test List View -->
+    <div id="list-view">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+        <h2>My Tests</h2>
+        <button class="btn" id="new-test-btn" style="width:auto;padding:10px 20px;">+ New Test</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Questions</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tests-body">
+          <tr><td colspan="4" style="text-align:center;color:#999;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Test Editor View -->
+    <div id="editor-view" class="hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+        <h2 id="editor-title">New Test</h2>
+        <button class="btn btn-secondary" id="back-btn" style="width:auto;padding:10px 20px;">← Back to Tests</button>
+      </div>
+
+      <div class="card" style="margin-bottom:24px;">
+        <div class="form-group">
+          <label>Test Title</label>
+          <input type="text" id="test-title" placeholder="e.g. Henle Latin 2 - Chapter 1 Vocabulary">
+        </div>
+        <div class="form-group">
+          <label>Description (optional)</label>
+          <input type="text" id="test-description" placeholder="Brief description of this test">
+        </div>
+        <button class="btn" id="save-test-btn" style="width:auto;padding:10px 20px;">Save Test Info</button>
+        <p id="test-error" class="error hidden"></p>
+      </div>
+
+      <!-- Questions -->
+      <div id="questions-section" class="hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h3>Questions</h3>
+          <button class="btn" id="add-question-btn" style="width:auto;padding:8px 16px;">+ Add Question</button>
+        </div>
+
+        <div id="questions-list"></div>
+
+        <!-- New Question Form -->
+        <div class="card hidden" id="question-form">
+          <h4 style="margin-bottom:16px;">New Question</h4>
+          <div class="form-group">
+            <label>Question</label>
+            <input type="text" id="q-text" placeholder="e.g. What does 'porta' mean?">
+          </div>
+          <div id="choices-list">
+            <label>Answer Choices</label>
+            <div class="choice-row" style="display:flex;gap:8px;margin-bottom:8px;">
+              <input type="radio" name="correct" value="0" checked>
+              <input type="text" class="choice-input" placeholder="Choice A" style="flex:1;">
+            </div>
+            <div class="choice-row" style="display:flex;gap:8px;margin-bottom:8px;">
+              <input type="radio" name="correct" value="1">
+              <input type="text" class="choice-input" placeholder="Choice B" style="flex:1;">
+            </div>
+            <div class="choice-row" style="display:flex;gap:8px;margin-bottom:8px;">
+              <input type="radio" name="correct" value="2">
+              <input type="text" class="choice-input" placeholder="Choice C" style="flex:1;">
+            </div>
+            <div class="choice-row" style="display:flex;gap:8px;margin-bottom:8px;">
+              <input type="radio" name="correct" value="3">
+              <input type="text" class="choice-input" placeholder="Choice D" style="flex:1;">
+            </div>
+            <p style="font-size:0.85rem;color:#666;margin-top:4px;">Select the radio button next to the correct answer.</p>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px;">
+            <button class="btn" id="save-question-btn" style="width:auto;padding:10px 20px;">Save Question</button>
+            <button class="btn btn-secondary" id="cancel-question-btn" style="width:auto;padding:10px 20px;">Cancel</button>
+          </div>
+          <p id="question-error" class="error hidden"></p>
+        </div>
+      </div>
+
+      <!-- Assign Test -->
+      <div id="assign-section" class="hidden" style="margin-top:24px;">
+        <div class="card">
+          <h3 style="margin-bottom:16px;">Assign to Students</h3>
+          <div id="student-checkboxes" style="margin-bottom:16px;"></div>
+          <button class="btn" id="assign-btn" style="width:auto;padding:10px 20px;">Assign Test</button>
+          <p id="assign-msg" class="hidden" style="color:green;margin-top:12px;"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth, logout } from '../js/auth.js'
+    import { supabase } from '../js/supabase.js'
+
+    const { user } = await requireAuth('teacher')
+    document.getElementById('logout-btn').addEventListener('click', logout)
+
+    const { data: school } = await supabase
+      .from('schools')
+      .select('id')
+      .eq('teacher_id', user.id)
+      .maybeSingle()
+
+    let currentTestId = null
+
+    // Load tests list
+    async function loadTests() {
+      const { data: tests } = await supabase
+        .from('tests')
+        .select('id, title, created_at')
+        .eq('school_id', school.id)
+        .eq('is_catalogue', false)
+        .order('created_at', { ascending: false })
+
+      const tbody = document.getElementById('tests-body')
+      if (!tests || tests.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;">No tests yet. Create one!</td></tr>'
+        return
+      }
+
+      // Get question counts
+      const counts = await Promise.all(tests.map(t =>
+        supabase.from('questions').select('*', { count: 'exact', head: true }).eq('test_id', t.id)
+      ))
+
+      tbody.innerHTML = tests.map((t, i) => `
+        <tr>
+          <td>${t.title}</td>
+          <td>${counts[i].count ?? 0}</td>
+          <td>${new Date(t.created_at).toLocaleDateString()}</td>
+          <td><button class="btn" onclick="editTest('${t.id}', '${t.title.replace(/'/g, "\\'")}')" style="width:auto;padding:6px 12px;font-size:0.85rem;">Edit / Assign</button></td>
+        </tr>
+      `).join('')
+    }
+
+    loadTests()
+
+    // Show/hide views
+    document.getElementById('new-test-btn').addEventListener('click', () => {
+      currentTestId = null
+      document.getElementById('editor-title').textContent = 'New Test'
+      document.getElementById('test-title').value = ''
+      document.getElementById('test-description').value = ''
+      document.getElementById('questions-section').classList.add('hidden')
+      document.getElementById('assign-section').classList.add('hidden')
+      document.getElementById('questions-list').innerHTML = ''
+      document.getElementById('list-view').classList.add('hidden')
+      document.getElementById('editor-view').classList.remove('hidden')
+    })
+
+    document.getElementById('back-btn').addEventListener('click', () => {
+      document.getElementById('editor-view').classList.add('hidden')
+      document.getElementById('list-view').classList.remove('hidden')
+      loadTests()
+    })
+
+    // Edit existing test
+    window.editTest = async function(testId, title) {
+      currentTestId = testId
+      document.getElementById('editor-title').textContent = 'Edit Test'
+      document.getElementById('test-title').value = title
+
+      const { data: test } = await supabase.from('tests').select('description').eq('id', testId).maybeSingle()
+      document.getElementById('test-description').value = test?.description || ''
+
+      document.getElementById('list-view').classList.add('hidden')
+      document.getElementById('editor-view').classList.remove('hidden')
+      document.getElementById('questions-section').classList.remove('hidden')
+      document.getElementById('assign-section').classList.remove('hidden')
+
+      loadQuestions()
+      loadStudentCheckboxes()
+    }
+
+    // Save test info
+    document.getElementById('save-test-btn').addEventListener('click', async () => {
+      const title = document.getElementById('test-title').value.trim()
+      const description = document.getElementById('test-description').value.trim()
+      const errorMsg = document.getElementById('test-error')
+
+      if (!title) {
+        errorMsg.textContent = 'Title is required.'
+        errorMsg.classList.remove('hidden')
+        return
+      }
+
+      if (currentTestId) {
+        await supabase.from('tests').update({ title, description }).eq('id', currentTestId)
+      } else {
+        const { data } = await supabase.from('tests').insert({
+          school_id: school.id,
+          title,
+          description,
+          is_catalogue: false
+        }).select().single()
+        currentTestId = data.id
+      }
+
+      errorMsg.classList.add('hidden')
+      document.getElementById('editor-title').textContent = 'Edit Test'
+      document.getElementById('questions-section').classList.remove('hidden')
+      document.getElementById('assign-section').classList.remove('hidden')
+      loadQuestions()
+      loadStudentCheckboxes()
+    })
+
+    // Load questions
+    async function loadQuestions() {
+      const { data: questions } = await supabase
+        .from('questions')
+        .select('id, question_text, position, choices(id, choice_text, is_correct)')
+        .eq('test_id', currentTestId)
+        .order('position')
+
+      const list = document.getElementById('questions-list')
+      if (!questions || questions.length === 0) {
+        list.innerHTML = '<p style="color:#999;margin-bottom:16px;">No questions yet.</p>'
+        return
+      }
+
+      list.innerHTML = questions.map((q, i) => {
+        const correct = q.choices?.find(c => c.is_correct)
+        return `
+          <div class="card" style="margin-bottom:12px;">
+            <strong>Q${i + 1}: ${q.question_text}</strong>
+            <ul style="margin-top:8px;padding-left:20px;">
+              ${q.choices?.map(c => `<li style="color:${c.is_correct ? 'green' : '#333'}">${c.choice_text}${c.is_correct ? ' ✓' : ''}</li>`).join('') || ''}
+            </ul>
+          </div>
+        `
+      }).join('')
+    }
+
+    // Question form
+    document.getElementById('add-question-btn').addEventListener('click', () => {
+      document.getElementById('question-form').classList.remove('hidden')
+      document.getElementById('q-text').value = ''
+      document.querySelectorAll('.choice-input').forEach(i => i.value = '')
+      document.querySelector('input[name="correct"][value="0"]').checked = true
+    })
+
+    document.getElementById('cancel-question-btn').addEventListener('click', () => {
+      document.getElementById('question-form').classList.add('hidden')
+    })
+
+    document.getElementById('save-question-btn').addEventListener('click', async () => {
+      const qText = document.getElementById('q-text').value.trim()
+      const choiceInputs = document.querySelectorAll('.choice-input')
+      const correctIndex = parseInt(document.querySelector('input[name="correct"]:checked').value)
+      const errorMsg = document.getElementById('question-error')
+
+      if (!qText) {
+        errorMsg.textContent = 'Question text is required.'
+        errorMsg.classList.remove('hidden')
+        return
+      }
+
+      const choices = Array.from(choiceInputs).map(i => i.value.trim()).filter(v => v)
+      if (choices.length < 2) {
+        errorMsg.textContent = 'Please add at least 2 answer choices.'
+        errorMsg.classList.remove('hidden')
+        return
+      }
+
+      // Get next position
+      const { count } = await supabase
+        .from('questions')
+        .select('*', { count: 'exact', head: true })
+        .eq('test_id', currentTestId)
+
+      const { data: question } = await supabase
+        .from('questions')
+        .insert({ test_id: currentTestId, question_text: qText, position: (count || 0) + 1 })
+        .select()
+        .single()
+
+      await supabase.from('choices').insert(
+        Array.from(choiceInputs)
+          .map((input, i) => ({ question_id: question.id, choice_text: input.value.trim(), is_correct: i === correctIndex }))
+          .filter(c => c.choice_text)
+      )
+
+      errorMsg.classList.add('hidden')
+      document.getElementById('question-form').classList.add('hidden')
+      loadQuestions()
+    })
+
+    // Load students for assignment
+    async function loadStudentCheckboxes() {
+      const { data: students } = await supabase
+        .from('students')
+        .select('id, grade, profiles(full_name)')
+        .eq('school_id', school.id)
+
+      const { data: existing } = await supabase
+        .from('assignments')
+        .select('student_id')
+        .eq('test_id', currentTestId)
+
+      const assignedIds = existing?.map(a => a.student_id) || []
+
+      const container = document.getElementById('student-checkboxes')
+      if (!students || students.length === 0) {
+        container.innerHTML = '<p style="color:#999;">No students added yet.</p>'
+        return
+      }
+
+      container.innerHTML = students.map(s => `
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <input type="checkbox" value="${s.id}" ${assignedIds.includes(s.id) ? 'checked' : ''}>
+          ${s.profiles?.full_name || s.id} ${s.grade ? `(${s.grade})` : ''}
+        </label>
+      `).join('')
+    }
+
+    // Assign test
+    document.getElementById('assign-btn').addEventListener('click', async () => {
+      const checked = Array.from(document.querySelectorAll('#student-checkboxes input:checked')).map(i => i.value)
+      const { data: existing } = await supabase.from('assignments').select('student_id').eq('test_id', currentTestId)
+      const assignedIds = existing?.map(a => a.student_id) || []
+      const toAdd = checked.filter(id => !assignedIds.includes(id))
+
+      if (toAdd.length > 0) {
+        await supabase.from('assignments').insert(toAdd.map(student_id => ({ test_id: currentTestId, student_id })))
+      }
+
+      const msg = document.getElementById('assign-msg')
+      msg.textContent = 'Assignments saved!'
+      msg.classList.remove('hidden')
+      setTimeout(() => msg.classList.add('hidden'), 3000)
+    })
+  </script>
+</body>
+</html>

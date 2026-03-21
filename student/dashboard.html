@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav>
+    <div>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="results.html">My Results</a>
+    </div>
+    <button class="btn btn-secondary" id="logout-btn" style="width:auto;padding:6px 16px;">Sign Out</button>
+  </nav>
+
+  <div class="page">
+    <h2>Welcome, <span id="student-name"></span></h2>
+
+    <h3 style="margin-bottom:16px;">My Assigned Tests</h3>
+
+    <div id="tests-list">
+      <p style="color:#999;">Loading...</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth, logout } from '../js/auth.js'
+    import { supabase } from '../js/supabase.js'
+
+    const { user, profile } = await requireAuth('student')
+    document.getElementById('student-name').textContent = profile.full_name || user.email
+    document.getElementById('logout-btn').addEventListener('click', logout)
+
+    // Load assigned tests
+    const { data: assignments } = await supabase
+      .from('assignments')
+      .select('id, due_date, tests(id, title, description)')
+      .eq('student_id', user.id)
+
+    const container = document.getElementById('tests-list')
+
+    if (!assignments || assignments.length === 0) {
+      container.innerHTML = '<p style="color:#999;">No tests assigned yet.</p>'
+    } else {
+      container.innerHTML = assignments.map(a => `
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <strong>${a.tests?.title || 'Untitled Test'}</strong>
+            ${a.tests?.description ? `<p style="color:#666;margin-top:4px;">${a.tests.description}</p>` : ''}
+            ${a.due_date ? `<p style="color:#999;font-size:0.85rem;margin-top:4px;">Due: ${new Date(a.due_date).toLocaleDateString()}</p>` : ''}
+          </div>
+          <a href="test.html?assignment=${a.id}" class="btn" style="width:auto;padding:10px 20px;text-decoration:none;">
+            Take Test
+          </a>
+        </div>
+      `).join('')
+    }
+  </script>
+</body>
+</html>

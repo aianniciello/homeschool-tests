@@ -33,7 +33,7 @@ export async function requireAuth(role) {
     return null
   }
   const profile = await getProfile(user.id)
-  if (role && profile.role !== role) {
+  if (!profile || (role && profile.role !== role)) {
     window.location.href = '/index.html'
     return null
   }

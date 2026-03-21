@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Complete Registration</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome!</h1>
+    <p class="subtitle" id="subtitle">Complete your account setup.</p>
+
+    <form id="register-form">
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="full-name" placeholder="Your name" required>
+      </div>
+      <button type="submit" class="btn">Complete Setup</button>
+      <p id="error-msg" class="error hidden"></p>
+    </form>
+  </div>
+
+  <script type="module">
+    import { supabase } from '../js/supabase.js'
+
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session) {
+      document.getElementById('subtitle').textContent = 'This link has expired. Ask your teacher to resend the invite.'
+      document.getElementById('register-form').classList.add('hidden')
+    }
+
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const fullName = document.getElementById('full-name').value.trim()
+      const errorMsg = document.getElementById('error-msg')
+
+      try {
+        const user = session.user
+
+        // Check for pending invite
+        const { data: invite } = await supabase
+          .from('pending_invites')
+          .select('*')
+          .ilike('email', user.email)
+          .maybeSingle()
+
+        if (!invite) throw new Error('No invite found for this email. Contact your teacher.')
+
+        // Create profile
+        const { error: profileError } = await supabase.from('profiles').upsert({
+          id: user.id,
+          role: 'student',
+          full_name: fullName,
+          email: user.email.toLowerCase()
+        })
+        if (profileError) throw profileError
+
+        // Create student record
+        const { error: studentError } = await supabase.from('students').insert({
+          id: user.id,
+          school_id: invite.school_id,
+          grade: invite.grade || null
+        })
+        if (studentError) throw studentError
+
+        // Remove pending invite
+        await supabase.from('pending_invites').delete().eq('id', invite.id)
+
+        window.location.href = '/student/dashboard.html'
+
+      } catch (err) {
+        errorMsg.textContent = err.message
+        errorMsg.classList.remove('hidden')
+      }
+    })
+  </script>
+</body>
+</html>
