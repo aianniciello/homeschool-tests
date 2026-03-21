@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Students</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav>
+    <div>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="students.html">Students</a>
+      <a href="tests.html">My Tests</a>
+      <a href="catalogue.html">Catalogue</a>
+      <a href="results.html">Results</a>
+    </div>
+    <button class="btn btn-secondary" id="logout-btn" style="width:auto;padding:6px 16px;">Sign Out</button>
+  </nav>
+
+  <div class="page">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+      <h2>Students</h2>
+      <button class="btn" id="add-btn" style="width:auto;padding:10px 20px;">+ Add Student</button>
+    </div>
+
+    <!-- Add Student Form -->
+    <div class="card hidden" id="add-form">
+      <h3 style="margin-bottom:16px;">Add New Student</h3>
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="student-name" placeholder="Jane Smith">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="student-email" placeholder="student@example.com">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="student-password" placeholder="Min 6 characters">
+      </div>
+      <div class="form-group">
+        <label>Grade</label>
+        <input type="text" id="student-grade" placeholder="e.g. 7th">
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" id="save-btn" style="width:auto;padding:10px 20px;">Save Student</button>
+        <button class="btn btn-secondary" id="cancel-btn" style="width:auto;padding:10px 20px;">Cancel</button>
+      </div>
+      <p id="form-error" class="error hidden"></p>
+      <p id="form-success" class="hidden" style="color:green;margin-top:12px;"></p>
+    </div>
+
+    <!-- Students Table -->
+    <table id="students-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Grade</th>
+        </tr>
+      </thead>
+      <tbody id="students-body">
+        <tr><td colspan="3" style="text-align:center;color:#999;">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    import { requireAuth, logout } from '../js/auth.js'
+    import { supabase } from '../js/supabase.js'
+
+    const { user } = await requireAuth('teacher')
+    document.getElementById('logout-btn').addEventListener('click', logout)
+
+    // Get school
+    const { data: school } = await supabase
+      .from('schools')
+      .select('id')
+      .eq('teacher_id', user.id)
+      .maybeSingle()
+
+    // Load students
+    async function loadStudents() {
+      const { data: studentList } = await supabase
+        .from('students')
+        .select('id, grade, profiles(full_name, id)')
+        .eq('school_id', school.id)
+
+      const tbody = document.getElementById('students-body')
+
+      if (!studentList || studentList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#999;">No students yet. Add one above!</td></tr>'
+        return
+      }
+
+      // Get emails from auth - we'll store them in profiles
+      const { data: profileList } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', studentList.map(s => s.id))
+
+      tbody.innerHTML = studentList.map(s => {
+        const profile = profileList?.find(p => p.id === s.id)
+        return `<tr>
+          <td>${profile?.full_name || '—'}</td>
+          <td>${profile?.email || '—'}</td>
+          <td>${s.grade || '—'}</td>
+        </tr>`
+      }).join('')
+    }
+
+    loadStudents()
+
+    // Toggle add form
+    document.getElementById('add-btn').addEventListener('click', () => {
+      document.getElementById('add-form').classList.remove('hidden')
+    })
+    document.getElementById('cancel-btn').addEventListener('click', () => {
+      document.getElementById('add-form').classList.add('hidden')
+    })
+
+    // Save student
+    document.getElementById('save-btn').addEventListener('click', async () => {
+      const name = document.getElementById('student-name').value.trim()
+      const email = document.getElementById('student-email').value.trim()
+      const password = document.getElementById('student-password').value
+      const grade = document.getElementById('student-grade').value.trim()
+      const errorMsg = document.getElementById('form-error')
+      const successMsg = document.getElementById('form-success')
+
+      if (!name || !email || !password) {
+        errorMsg.textContent = 'Name, email, and password are required.'
+        errorMsg.classList.remove('hidden')
+        return
+      }
+
+      try {
+        // Create auth user for student
+        const { data, error } = await supabase.auth.signUp({ email, password })
+        if (error) throw error
+
+        const studentId = data.user.id
+
+        // Create profile
+        await supabase.from('profiles').insert({ id: studentId, role: 'student', full_name: name })
+
+        // Create student record
+        await supabase.from('students').insert({ id: studentId, school_id: school.id, grade })
+
+        successMsg.textContent = `${name} added successfully!`
+        successMsg.classList.remove('hidden')
+        errorMsg.classList.add('hidden')
+
+        // Clear form
+        document.getElementById('student-name').value = ''
+        document.getElementById('student-email').value = ''
+        document.getElementById('student-password').value = ''
+        document.getElementById('student-grade').value = ''
+
+        loadStudents()
+      } catch (err) {
+        errorMsg.textContent = err.message
+        errorMsg.classList.remove('hidden')
+      }
+    })
+  </script>
+</body>
+</html>
