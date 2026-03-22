@@ -1,0 +1,8 @@
+# API keys — never commit
+api/config.php
+
+# Local dev only
+dev-server.js
+
+# macOS
+.DS_Store

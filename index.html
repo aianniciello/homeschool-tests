@@ -5,16 +5,62 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Homeschool Tests</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    .container {
+      padding: 0;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(120, 120, 120, 0.35);
+    }
+    .login-header-img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .login-body {
+      position: relative;
+      z-index: 1;
+      margin-top: -600px;
+      padding: 32px 48px 48px;
+    }
+    .tab-bar {
+      display: flex;
+      background: var(--surface-low);
+      border-radius: var(--radius-md);
+      padding: 4px;
+      margin-bottom: 28px;
+      gap: 2px;
+    }
+    .tab-bar button {
+      flex: 1;
+      padding: 8px 10px;
+      background: transparent;
+      border: none;
+      border-radius: calc(var(--radius-md) - 2px);
+      font-size: 0.8rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      color: var(--on-surface-variant);
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition), box-shadow var(--transition);
+      white-space: nowrap;
+    }
+    .tab-bar button.tab-active {
+      background: var(--surface-card);
+      color: var(--on-surface);
+      box-shadow: 0 1px 4px rgba(12,52,89,0.10);
+    }
+  </style>
 </head>
 <body>
   <div class="container">
-    <h1>Homeschool Tests</h1>
+    <img src="img/logo_login_header.png" alt="Boring Boxes" class="login-header-img">
 
-    <!-- Tab buttons -->
-    <div style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;">
-      <button class="btn" id="tab-login">Sign In</button>
-      <button class="btn btn-secondary" id="tab-register">Register as Teacher</button>
-      <button class="btn btn-secondary" id="tab-student">Student Login Link</button>
+    <div class="login-body">
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <button id="tab-login" class="tab-active">Sign In</button>
+      <button id="tab-register" class="hidden">Register</button>
+      <button id="tab-student">Student</button>
     </div>
 
     <!-- Login form -->
@@ -73,6 +119,7 @@
       <p id="student-error" class="error hidden"></p>
       <p id="student-success" class="hidden" style="color:green;margin-top:12px;"></p>
     </form>
+    </div><!-- /.login-body -->
   </div>
 
   <script type="module">
@@ -89,13 +136,18 @@
       }
     })
 
+    // Show Register tab only when ?register=boringboxes is in the URL
+    if (new URLSearchParams(window.location.search).get('register') === 'boringboxes') {
+      document.getElementById('tab-register').classList.remove('hidden')
+    }
+
     function showTab(tab) {
       document.getElementById('login-form').classList.toggle('hidden', tab !== 'login')
       document.getElementById('register-form').classList.toggle('hidden', tab !== 'register')
       document.getElementById('student-form').classList.toggle('hidden', tab !== 'student')
-      document.getElementById('tab-login').classList.toggle('btn-secondary', tab !== 'login')
-      document.getElementById('tab-register').classList.toggle('btn-secondary', tab !== 'register')
-      document.getElementById('tab-student').classList.toggle('btn-secondary', tab !== 'student')
+      document.getElementById('tab-login').classList.toggle('tab-active', tab === 'login')
+      document.getElementById('tab-register').classList.toggle('tab-active', tab === 'register')
+      document.getElementById('tab-student').classList.toggle('tab-active', tab === 'student')
     }
 
     document.getElementById('tab-login').addEventListener('click', () => showTab('login'))
@@ -161,11 +213,20 @@
     // Student magic link
     document.getElementById('student-form').addEventListener('submit', async (e) => {
       e.preventDefault()
-      const email = document.getElementById('student-email').value
+      const email = document.getElementById('student-email').value.trim().toLowerCase()
       const errorMsg = document.getElementById('student-error')
       const successMsg = document.getElementById('student-success')
 
       try {
+        // Only allow emails a teacher has added (pending invite or already registered student)
+        const [{ data: invite }, { data: studentProfile }] = await Promise.all([
+          supabase.from('pending_invites').select('id').eq('email', email).maybeSingle(),
+          supabase.from('profiles').select('id').eq('email', email).eq('role', 'student').maybeSingle()
+        ])
+        if (!invite && !studentProfile) {
+          throw new Error("This email hasn't been added by a teacher. Ask your teacher to send you an invite.")
+        }
+
         const { error } = await supabase.auth.signInWithOtp({
           email,
           options: { emailRedirectTo: `${window.location.origin}/student/dashboard.html` }

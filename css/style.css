@@ -163,7 +163,7 @@ body {
   background: var(--surface-card);
   padding: 48px;
   border-radius: var(--radius-xl);
-  box-shadow: 0 8px 32px rgba(12, 52, 89, 0.08);
+  box-shadow: 0 8px 32px rgba(120, 120, 120, 0.2);
 }
 
 /* ─── Typography ─────────────────────────────────────────── */
@@ -229,6 +229,31 @@ select:focus {
 input[type="text"]::placeholder,
 input[type="email"]::placeholder,
 input[type="password"]::placeholder {
+  color: var(--on-surface-variant);
+  opacity: 0.6;
+}
+
+textarea {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--surface-low);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-family: 'Inter', sans-serif;
+  color: var(--on-surface);
+  transition: background var(--transition), box-shadow var(--transition);
+  resize: vertical;
+  line-height: 1.6;
+}
+
+textarea:focus {
+  outline: none;
+  background: var(--surface-card);
+  box-shadow: 0 0 0 2px var(--primary-container);
+}
+
+textarea::placeholder {
   color: var(--on-surface-variant);
   opacity: 0.6;
 }
@@ -377,4 +402,91 @@ tbody tr:last-child td {
 .chip-error {
   background: var(--error-container);
   color: var(--on-error-container);
+}
+
+/* ─── Mobile nav ─────────────────────────────────────────── */
+#nav-toggle {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 200;
+  background: var(--surface-card);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(12, 52, 89, 0.12);
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+}
+
+#nav-toggle span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--on-surface);
+  border-radius: 2px;
+  transition: transform 220ms ease-in-out, opacity 220ms ease-in-out;
+}
+
+#nav-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 52, 89, 0.45);
+  z-index: 49;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Sidebar off-screen by default */
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 220ms ease-in-out;
+  }
+
+  /* Slide in when open */
+  body.nav-open .sidebar {
+    transform: translateX(0);
+    box-shadow: 4px 0 32px rgba(12, 52, 89, 0.15);
+  }
+
+  /* Show backdrop when open */
+  body.nav-open #nav-backdrop {
+    display: block;
+  }
+
+  /* Hamburger visible */
+  #nav-toggle {
+    display: flex;
+  }
+
+  /* Animate to X when open */
+  body.nav-open #nav-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  body.nav-open #nav-toggle span:nth-child(2) { opacity: 0; }
+  body.nav-open #nav-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  /* Page takes full width */
+  .page {
+    margin-left: 0;
+    padding: 70px 20px 40px;
+  }
+
+  /* Typography scale down slightly */
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.15rem; }
+
+  /* Cards tighter on mobile */
+  .card { padding: 20px 16px; }
+
+  /* Tables scroll horizontally */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }

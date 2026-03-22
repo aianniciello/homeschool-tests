@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Socratic Dialogue Trainer</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    /* ── Dialogue bubbles ───────────────────────────────────── */
+    .dialogue-bubble {
+      padding: 14px 18px;
+      border-radius: var(--radius-md);
+      margin-bottom: 10px;
+      background: var(--surface-card);
+      border: 1px solid rgba(64,97,137,0.12);
+    }
+    .bubble-socrates {
+      background: var(--surface-low);
+      border-left: 3px solid var(--primary);
+    }
+    .bubble-speaker {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 5px;
+      color: var(--on-surface-variant);
+    }
+    .bubble-socrates .bubble-speaker { color: var(--primary); }
+    .dialogue-bubble p { font-size: 0.9rem; line-height: 1.65; color: var(--on-surface); margin: 0; }
+
+    /* ── Highlighted quote ──────────────────────────────────── */
+    .dialogue-highlight {
+      background: var(--surface-low);
+      border-left: 3px solid var(--primary);
+      padding: 14px 18px;
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      font-style: italic;
+      font-size: 0.9rem;
+      color: var(--on-surface);
+      line-height: 1.65;
+      margin: 0 0 16px;
+    }
+
+    /* ── MC options ─────────────────────────────────────────── */
+    .mc-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 13px 16px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(64,97,137,0.15);
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+      background: var(--surface-card);
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    .mc-option:hover:not(.mc-disabled) {
+      background: var(--surface-low);
+      border-color: var(--primary-container);
+    }
+    .mc-option.mc-correct { background: var(--secondary-container); border-color: var(--on-secondary-container); }
+    .mc-option.mc-wrong   { background: var(--error-container);     border-color: var(--error); }
+    .mc-option.mc-disabled { cursor: default; }
+    .mc-letter { font-weight: 700; color: var(--on-surface-variant); flex-shrink: 0; }
+
+    /* ── Move chips ─────────────────────────────────────────── */
+    .move-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 14px;
+      border-radius: 99px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      background: var(--surface-high);
+      color: var(--on-surface-variant);
+      transition: background var(--transition), color var(--transition);
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 0.01em;
+    }
+    .move-chip:hover:not(:disabled) { background: var(--primary-container); color: var(--on-primary-container); }
+    .move-chip.chip-selected  { background: var(--primary-container);    color: var(--on-primary-container); }
+    .move-chip.chip-correct   { background: var(--secondary-container);  color: var(--on-secondary-container); }
+    .move-chip.chip-wrong     { background: var(--error-container);      color: var(--on-error-container); }
+    .move-chip.chip-missed    { background: var(--tertiary-container);   color: var(--tertiary); outline: 2px dashed var(--tertiary); }
+    .move-chip:disabled       { cursor: default; }
+
+    /* ── Progress dots ──────────────────────────────────────── */
+    .progress-dots { display: flex; gap: 5px; align-items: center; }
+    .progress-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--surface-high);
+      transition: background var(--transition), width var(--transition), border-radius var(--transition);
+    }
+    .progress-dot.dot-done   { background: var(--primary-container); }
+    .progress-dot.dot-active { background: var(--primary); width: 20px; border-radius: 4px; }
+
+    /* ── Explanation / feedback boxes ───────────────────────── */
+    .explanation-box {
+      background: var(--surface-low);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      font-size: 0.875rem;
+      color: var(--on-surface-variant);
+      line-height: 1.6;
+    }
+    .feedback-box {
+      background: var(--surface-low);
+      border: 1px solid var(--primary-container);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      font-size: 0.875rem;
+      line-height: 1.7;
+      color: var(--on-surface);
+      white-space: pre-wrap;
+    }
+
+    /* ── Context blurb ──────────────────────────────────────── */
+    .context-blurb {
+      background: var(--surface-high);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      font-size: 0.85rem;
+      color: var(--on-surface-variant);
+      line-height: 1.55;
+      margin-bottom: 20px;
+    }
+    .context-blurb strong {
+      display: block;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 3px;
+      color: var(--on-surface-variant);
+    }
+
+    /* ── Score ring ─────────────────────────────────────────── */
+    .score-ring-wrap { display: flex; flex-direction: column; align-items: center; padding: 24px 0 16px; }
+    .score-ring-num  { font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 2.4rem; margin-top: 10px; }
+    .score-breakdown { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
+    .score-cell      { text-align: center; padding: 14px 8px; background: var(--surface-low); border-radius: var(--radius-md); }
+    .score-cell-label{ font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--on-surface-variant); margin-bottom: 5px; }
+    .score-cell-val  { font-size: 1.4rem; font-weight: 700; font-family: 'Manrope', sans-serif; color: var(--on-surface); }
+
+    /* ── Glossary ───────────────────────────────────────────── */
+    .glossary-item { padding: 12px 0; border-bottom: 1px solid rgba(64,97,137,0.08); }
+    .glossary-item:last-child { border-bottom: none; }
+    .glossary-term { font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 3px; }
+    .glossary-def  { font-size: 0.85rem; color: var(--on-surface-variant); line-height: 1.55; }
+
+    /* ── Screen container ───────────────────────────────────── */
+    .screen { max-width: 680px; }
+    .task-section-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-weight: 600;
+      color: var(--on-surface-variant);
+      margin-bottom: 10px;
+    }
+    .screen-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .exchange-counter {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--on-surface-variant);
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="sidebar">
+    <div class="sidebar-brand">Boring Boxes</div>
+    <div class="sidebar-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="results.html">My Results</a>
+      <a href="socratic.html">Socratic Trainer</a>
+      <a href="profile.html">Profile</a>
+    </div>
+    <div class="sidebar-footer">
+      <div id="nav-user-info" class="sidebar-user"></div>
+      <button id="logout-btn" class="btn-sign-out">Sign Out</button>
+    </div>
+  </nav>
+  <script>(function(){const f=location.pathname.split('/').pop();document.querySelectorAll('.sidebar-links a').forEach(a=>{if(a.getAttribute('href')===f)a.classList.add('active')})})()</script>
+
+  <div class="page">
+
+    <!-- ══ SCREEN: HOME ══════════════════════════════════════ -->
+    <div id="screen-home" class="screen">
+      <div style="margin-bottom:32px;">
+        <h2 style="margin-bottom:4px;">Socratic Dialogue Trainer</h2>
+        <p style="color:#666;font-size:0.9rem;">Study Plato's dialogues through close reading, move identification, and question writing.</p>
+      </div>
+
+      <!-- Past sessions -->
+      <div id="past-sessions" class="hidden" style="margin-bottom:36px;">
+        <h3 style="margin-bottom:14px;">Recent Sessions</h3>
+        <div class="card" style="padding:8px 24px;">
+          <div id="past-sessions-list"></div>
+        </div>
+      </div>
+
+      <!-- Dialogue cards -->
+      <h3 style="margin-bottom:16px;">Choose a Dialogue</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px;margin-bottom:44px;">
+
+        <div class="card" style="display:flex;flex-direction:column;justify-content:space-between;">
+          <div>
+            <p style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--on-surface-variant);font-weight:700;margin-bottom:8px;">Plato · Meno</p>
+            <h3 style="font-size:1.15rem;margin-bottom:8px;">What is virtue?</h3>
+            <p style="color:#666;font-size:0.875rem;line-height:1.6;margin:0;">Socrates dismantles five of Meno's attempts to define virtue through irony, counterexample, and reductio.</p>
+            <p style="color:#999;font-size:0.8rem;margin-top:12px;margin-bottom:0;">5 exchanges · reading · labeling · writing</p>
+          </div>
+          <button class="btn" onclick="startDialogue('meno')" style="margin-top:20px;">Begin Meno →</button>
+        </div>
+
+        <div class="card" style="display:flex;flex-direction:column;justify-content:space-between;">
+          <div>
+            <p style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--on-surface-variant);font-weight:700;margin-bottom:8px;">Plato · Crito</p>
+            <h3 style="font-size:1.15rem;margin-bottom:8px;">Should Socrates escape?</h3>
+            <p style="color:#666;font-size:0.875rem;line-height:1.6;margin:0;">Socrates refutes Crito's plea using the social contract, analogy, and reductio to defend submitting to the law.</p>
+            <p style="color:#999;font-size:0.8rem;margin-top:12px;margin-bottom:0;">5 exchanges · reading · labeling · writing</p>
+          </div>
+          <button class="btn" onclick="startDialogue('crito')" style="margin-top:20px;">Begin Crito →</button>
+        </div>
+
+      </div>
+
+      <!-- Glossary -->
+      <h3 style="margin-bottom:16px;">Socratic Moves Reference</h3>
+      <div class="card" style="padding:8px 28px;">
+        <div id="glossary-list"></div>
+      </div>
+    </div>
+
+    <!-- ══ SCREEN: READING ═══════════════════════════════════ -->
+    <div id="screen-reading" class="screen hidden">
+      <div class="screen-nav">
+        <button class="btn btn-secondary" onclick="goHome()" style="width:auto;padding:8px 16px;">← Dialogues</button>
+        <div class="exchange-counter">
+          <span id="reading-label"></span>
+          <div id="reading-dots" class="progress-dots" style="margin-top:6px;justify-content:flex-end;"></div>
+        </div>
+      </div>
+
+      <div class="context-blurb"><strong>Context</strong><span id="reading-context"></span></div>
+      <div id="reading-bubbles" style="margin-bottom:28px;"></div>
+      <button class="btn" onclick="startTasks()" style="width:auto;padding:11px 28px;">Analyse this exchange →</button>
+    </div>
+
+    <!-- ══ SCREEN: TASK 1 — MC ════════════════════════════════ -->
+    <div id="screen-task-mc" class="screen hidden">
+      <div class="screen-nav">
+        <button class="btn btn-secondary" onclick="backToReading()" style="width:auto;padding:8px 16px;">← Re-read</button>
+        <div class="exchange-counter">
+          <span id="mc-label"></span>
+          <div id="mc-dots" class="progress-dots" style="margin-top:6px;justify-content:flex-end;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="task-section-label">Task 1 of 3 — Reading Check</p>
+        <p id="mc-question" style="font-weight:600;font-size:0.975rem;margin-bottom:20px;line-height:1.55;"></p>
+        <div id="mc-options"></div>
+        <div id="mc-explanation" class="explanation-box hidden" style="margin-top:16px;"></div>
+      </div>
+      <button id="mc-next-btn" class="btn hidden" onclick="nextToLabel()" style="width:auto;padding:11px 28px;margin-top:16px;">Next task →</button>
+    </div>
+
+    <!-- ══ SCREEN: TASK 2 — LABEL ════════════════════════════ -->
+    <div id="screen-task-label" class="screen hidden">
+      <div class="screen-nav">
+        <button class="btn btn-secondary" onclick="backToReading()" style="width:auto;padding:8px 16px;">← Re-read</button>
+        <div class="exchange-counter">
+          <span id="label-label"></span>
+          <div id="label-dots" class="progress-dots" style="margin-top:6px;justify-content:flex-end;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="task-section-label">Task 2 of 3 — Label the Move</p>
+        <div id="label-highlight" class="dialogue-highlight"></div>
+        <p style="font-size:0.85rem;color:var(--on-surface-variant);margin-bottom:14px;">Which Socratic move(s) does Socrates use here? Select all that apply.</p>
+        <div id="label-chips" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;"></div>
+        <button id="label-submit-btn" class="btn" onclick="submitLabel()" style="width:auto;padding:10px 24px;">Submit</button>
+        <div id="label-feedback" class="explanation-box hidden" style="margin-top:16px;"></div>
+      </div>
+      <button id="label-next-btn" class="btn hidden" onclick="nextToWrite()" style="width:auto;padding:11px 28px;margin-top:16px;">Next task →</button>
+    </div>
+
+    <!-- ══ SCREEN: TASK 3 — WRITE ════════════════════════════ -->
+    <div id="screen-task-write" class="screen hidden">
+      <div class="screen-nav">
+        <button class="btn btn-secondary" onclick="backToReading()" style="width:auto;padding:8px 16px;">← Re-read</button>
+        <div class="exchange-counter">
+          <span id="write-label"></span>
+          <div id="write-dots" class="progress-dots" style="margin-top:6px;justify-content:flex-end;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="task-section-label">Task 3 of 3 — Write the Next Question</p>
+        <div class="context-blurb" style="margin-bottom:20px;"><strong>Context</strong><span id="write-context"></span></div>
+        <label for="write-input">What should Socrates ask next?</label>
+        <textarea id="write-input" rows="4" style="margin-top:8px;" placeholder="Write Socrates' next question here…"></textarea>
+        <div style="margin-top:14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <button id="write-feedback-btn" class="btn" onclick="getWriteFeedback()" style="width:auto;padding:10px 24px;">Get AI feedback →</button>
+          <span id="write-loading" class="hidden" style="font-size:0.85rem;color:var(--on-surface-variant);">Analysing your question…</span>
+        </div>
+        <div id="write-feedback-box" class="feedback-box hidden" style="margin-top:16px;"></div>
+      </div>
+      <button id="write-continue-btn" class="btn hidden" onclick="continueFromWrite()" style="width:auto;padding:11px 28px;margin-top:16px;">Continue →</button>
+    </div>
+
+    <!-- ══ SCREEN: RESULTS ═══════════════════════════════════ -->
+    <div id="screen-results" class="screen hidden">
+      <h2>You completed <em id="results-title" style="font-style:normal;color:var(--primary);"></em></h2>
+      <p style="color:#666;margin-bottom:24px;font-size:0.9rem;">Here's how you did across all three task types.</p>
+
+      <div class="card" style="padding:32px 28px;">
+        <div class="score-ring-wrap">
+          <svg id="results-ring-svg" viewBox="0 0 100 100" style="width:150px;height:150px;display:block;">
+            <circle cx="50" cy="50" r="42" fill="none" stroke="var(--surface-high)" stroke-width="10"/>
+            <circle id="results-ring-arc" cx="50" cy="50" r="42" fill="none"
+              stroke="var(--primary)" stroke-width="10"
+              stroke-linecap="round"
+              transform="rotate(-90 50 50)"
+              stroke-dasharray="263.89"
+              stroke-dashoffset="263.89"
+              style="transition: stroke-dashoffset 0.9s ease, stroke 0.4s ease;"/>
+          </svg>
+          <p id="results-score-num" class="score-ring-num">—</p>
+        </div>
+
+        <div class="score-breakdown">
+          <div class="score-cell">
+            <p class="score-cell-label">Reading Checks</p>
+            <p id="res-mc"    class="score-cell-val">—</p>
+          </div>
+          <div class="score-cell">
+            <p class="score-cell-label">Move Labeling</p>
+            <p id="res-label" class="score-cell-val">—</p>
+          </div>
+          <div class="score-cell">
+            <p class="score-cell-label">Question Writing</p>
+            <p id="res-write" class="score-cell-val">—</p>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;">
+        <button class="btn" onclick="tryAgain()" style="width:auto;padding:11px 28px;">Try again</button>
+        <button class="btn btn-secondary" onclick="goHome()" style="width:auto;padding:11px 28px;">← Back to home</button>
+      </div>
+    </div>
+
+  </div><!-- /.page -->
+
+  <script type="module">
+    import { requireAuth, logout } from '../js/auth.js'
+    import { supabase } from '../js/supabase.js'
+    import { DIALOGUES, SOCRATIC_MOVES, MOVES_GLOSSARY } from '../js/socratic-data.js'
+
+    const { user, profile } = await requireAuth('student')
+    document.getElementById('logout-btn').addEventListener('click', logout)
+    document.getElementById('nav-user-info').textContent = 'Student: ' + (profile.full_name || user.email)
+
+    // Fetch student's school_id for saving sessions
+    const { data: studentInfo } = await supabase
+      .from('students').select('school_id').eq('id', user.id).maybeSingle()
+    const schoolId = studentInfo?.school_id || null
+
+    // ── State ─────────────────────────────────────────────────
+    let dialogueKey    = null
+    let exchangeIndex  = 0
+    let scores         = { mc: [], label: [], write: [] }
+    let exchangeDetails = [] // {studentQuestion, aiFeedback, writeRating} per exchange
+    let selectedMoves  = new Set()
+    let mcAnswered     = false
+    let labelSubmitted = false
+
+    // ── Helpers ───────────────────────────────────────────────
+    const dialogue = () => DIALOGUES[dialogueKey]
+    const exchange = () => dialogue().exchanges[exchangeIndex]
+    const total    = () => dialogue().exchanges.length
+    const moveId   = m => 'chip-' + m.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'))
+      document.getElementById(id).classList.remove('hidden')
+    }
+
+    function dots(labelEl, dotsEl, current, tot) {
+      labelEl.textContent = `Exchange ${current + 1} of ${tot}`
+      dotsEl.innerHTML = Array.from({ length: tot }, (_, i) =>
+        `<div class="progress-dot ${i < current ? 'dot-done' : i === current ? 'dot-active' : ''}"></div>`
+      ).join('')
+    }
+
+    // ── Glossary ──────────────────────────────────────────────
+    document.getElementById('glossary-list').innerHTML =
+      SOCRATIC_MOVES.map(m => `
+        <div class="glossary-item">
+          <p class="glossary-term">${m}</p>
+          <p class="glossary-def">${MOVES_GLOSSARY[m]}</p>
+        </div>
+      `).join('')
+
+    // ── History (Supabase + localStorage fallback) ────────────
+    async function loadAndRenderHistory() {
+      const el = document.getElementById('past-sessions')
+      let sessions = []
+
+      // Try Supabase first
+      const { data } = await supabase
+        .from('socratic_sessions')
+        .select('dialogue_title, overall_score, completed_at')
+        .eq('student_id', user.id)
+        .order('completed_at', { ascending: false })
+        .limit(4)
+
+      if (data && data.length) {
+        sessions = data.map(s => ({
+          title: s.dialogue_title,
+          score: s.overall_score,
+          date: new Date(s.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        }))
+      } else {
+        // Fallback to localStorage
+        try { sessions = JSON.parse(localStorage.getItem('socratic-history') || '[]').slice(0, 4) }
+        catch { sessions = [] }
+      }
+
+      if (!sessions.length) { el.classList.add('hidden'); return }
+      el.classList.remove('hidden')
+      document.getElementById('past-sessions-list').innerHTML = sessions.map((s, i) => {
+        const color = s.score >= 80 ? 'var(--on-secondary-container)' : s.score >= 60 ? 'var(--tertiary)' : 'var(--error)'
+        const border = i < sessions.length - 1 ? 'border-bottom:1px solid rgba(64,97,137,0.08);' : ''
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;${border}">
+            <div>
+              <strong style="font-size:0.875rem;">${s.title}</strong>
+              <p style="color:#999;font-size:0.78rem;margin-top:2px;">${s.date}</p>
+            </div>
+            <span style="font-size:1.15rem;font-weight:700;font-family:'Manrope',sans-serif;color:${color};">${s.score}%</span>
+          </div>
+        `
+      }).join('')
+    }
+
+    async function saveSession(mcAvg, labelAvg, writeAvg, overall) {
+      if (!schoolId) return // can't save without school association
+
+      // Insert session row
+      const { data: session, error } = await supabase
+        .from('socratic_sessions')
+        .insert({
+          student_id:     user.id,
+          school_id:      schoolId,
+          dialogue_key:   dialogueKey,
+          dialogue_title: dialogue().title,
+          mc_score:       mcAvg,
+          label_score:    labelAvg,
+          write_score:    writeAvg,
+          overall_score:  overall,
+        })
+        .select('id')
+        .single()
+
+      if (error) { console.error('Session save error:', error); return }
+
+      // Insert per-exchange response rows
+      const responses = scores.mc.map((mc, i) => ({
+        session_id:      session.id,
+        exchange_index:  i,
+        mc_correct:      mc === 1,
+        label_score:     scores.label[i] ?? 0,
+        student_question: exchangeDetails[i]?.studentQuestion ?? null,
+        ai_feedback:     exchangeDetails[i]?.aiFeedback ?? null,
+        write_rating:    exchangeDetails[i]?.writeRating ?? null,
+      }))
+
+      await supabase.from('socratic_responses').insert(responses)
+
+      // Also mirror to localStorage as a quick-read cache
+      try {
+        const h = JSON.parse(localStorage.getItem('socratic-history') || '[]')
+        h.unshift({ title: dialogue().title, score: overall, date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) })
+        if (h.length > 10) h.splice(10)
+        localStorage.setItem('socratic-history', JSON.stringify(h))
+      } catch { /* ignore */ }
+    }
+
+    // ── Home ──────────────────────────────────────────────────
+    function renderHome() {
+      loadAndRenderHistory()
+      showScreen('screen-home')
+    }
+
+    // ── Start dialogue ────────────────────────────────────────
+    window.startDialogue = function(key) {
+      dialogueKey    = key
+      exchangeIndex  = 0
+      scores         = { mc: [], label: [], write: [] }
+      exchangeDetails = []
+      renderReading()
+    }
+
+    window.goHome = renderHome
+
+    // ── Reading screen ────────────────────────────────────────
+    function renderReading() {
+      const ex = exchange()
+      mcAnswered     = false
+      labelSubmitted = false
+      selectedMoves  = new Set()
+
+      dots(
+        document.getElementById('reading-label'),
+        document.getElementById('reading-dots'),
+        exchangeIndex, total()
+      )
+      document.getElementById('reading-context').textContent = ex.context
+      document.getElementById('reading-bubbles').innerHTML = ex.bubbles.map(b => `
+        <div class="dialogue-bubble bubble-${b.speaker.toLowerCase()}">
+          <div class="bubble-speaker">${b.speaker}</div>
+          <p>${b.text}</p>
+        </div>
+      `).join('')
+
+      showScreen('screen-reading')
+    }
+
+    window.backToReading = renderReading
+    window.startTasks    = renderMC
+
+    // ── Task 1: MC ────────────────────────────────────────────
+    function renderMC() {
+      const ex = exchange()
+      dots(document.getElementById('mc-label'), document.getElementById('mc-dots'), exchangeIndex, total())
+      document.getElementById('mc-question').textContent = ex.mc.question
+
+      const letters = ['A', 'B', 'C', 'D']
+      document.getElementById('mc-options').innerHTML = ex.mc.options.map((opt, i) => `
+        <div class="mc-option" id="mc-opt-${i}" onclick="answerMC(${i})">
+          <span class="mc-letter">${letters[i]}.</span>
+          <span>${opt.text}</span>
+        </div>
+      `).join('')
+
+      document.getElementById('mc-explanation').classList.add('hidden')
+      document.getElementById('mc-next-btn').classList.add('hidden')
+      showScreen('screen-task-mc')
+    }
+
+    window.answerMC = function(index) {
+      if (mcAnswered) return
+      mcAnswered = true
+
+      const ex = exchange()
+      const correct = ex.mc.options[index].correct
+      scores.mc.push(correct ? 1 : 0)
+
+      ex.mc.options.forEach((opt, i) => {
+        const el = document.getElementById(`mc-opt-${i}`)
+        el.classList.add('mc-disabled')
+        el.onclick = null
+        if (opt.correct) el.classList.add('mc-correct')
+        if (i === index && !opt.correct) el.classList.add('mc-wrong')
+      })
+
+      const expEl = document.getElementById('mc-explanation')
+      const tag = correct
+        ? `<strong style="color:var(--on-secondary-container);">✓ Correct</strong>`
+        : `<strong style="color:var(--error);">✗ Incorrect</strong>`
+      expEl.innerHTML = `${tag}<br><br>${ex.mc.explanation}`
+      expEl.classList.remove('hidden')
+      document.getElementById('mc-next-btn').classList.remove('hidden')
+    }
+
+    window.nextToLabel = renderLabel
+
+    // ── Task 2: Label ─────────────────────────────────────────
+    function renderLabel() {
+      const ex = exchange()
+      dots(document.getElementById('label-label'), document.getElementById('label-dots'), exchangeIndex, total())
+
+      document.getElementById('label-highlight').textContent = `"${ex.highlighted}"`
+      selectedMoves = new Set()
+
+      document.getElementById('label-chips').innerHTML = SOCRATIC_MOVES.map(m => `
+        <button class="move-chip" id="${moveId(m)}" onclick="toggleMove('${m.replace(/'/g, "\\'")}')">${m}</button>
+      `).join('')
+
+      document.getElementById('label-submit-btn').disabled = false
+      document.getElementById('label-submit-btn').classList.remove('hidden')
+      document.getElementById('label-feedback').classList.add('hidden')
+      document.getElementById('label-next-btn').classList.add('hidden')
+      showScreen('screen-task-label')
+    }
+
+    window.toggleMove = function(move) {
+      if (labelSubmitted) return
+      const chip = document.getElementById(moveId(move))
+      if (selectedMoves.has(move)) {
+        selectedMoves.delete(move)
+        chip.classList.remove('chip-selected')
+      } else {
+        selectedMoves.add(move)
+        chip.classList.add('chip-selected')
+      }
+    }
+
+    window.submitLabel = function() {
+      if (labelSubmitted) return
+      labelSubmitted = true
+
+      const ex      = exchange()
+      const correct = new Set(ex.correctMoves)
+      let hits = 0
+
+      SOCRATIC_MOVES.forEach(m => {
+        const chip = document.getElementById(moveId(m))
+        chip.disabled = true
+        chip.onclick  = null
+        const wasSelected = selectedMoves.has(m)
+        const isCorrect   = correct.has(m)
+
+        chip.classList.remove('chip-selected')
+        if (isCorrect && wasSelected)  { chip.classList.add('chip-correct'); hits++ }
+        else if (!isCorrect && wasSelected) chip.classList.add('chip-wrong')
+        else if (isCorrect && !wasSelected) chip.classList.add('chip-missed')
+      })
+
+      scores.label.push(hits / correct.size)
+
+      const fb = document.getElementById('label-feedback')
+      fb.innerHTML = `
+        <strong>Correct moves:</strong> ${ex.correctMoves.join(', ')}<br>
+        <span>You identified ${hits} of ${correct.size}.</span>
+        ${hits < correct.size ? '<br><span style="color:var(--tertiary);font-size:0.82rem;margin-top:4px;display:block;">Dashed chips show moves you missed.</span>' : ''}
+      `
+      fb.classList.remove('hidden')
+      document.getElementById('label-submit-btn').classList.add('hidden')
+      document.getElementById('label-next-btn').classList.remove('hidden')
+    }
+
+    window.nextToWrite = renderWrite
+
+    // ── Task 3: Write ─────────────────────────────────────────
+    function renderWrite() {
+      const ex = exchange()
+      dots(document.getElementById('write-label'), document.getElementById('write-dots'), exchangeIndex, total())
+
+      document.getElementById('write-context').textContent = ex.writeContext
+      document.getElementById('write-input').value = ''
+      document.getElementById('write-feedback-box').classList.add('hidden')
+      document.getElementById('write-continue-btn').classList.add('hidden')
+      document.getElementById('write-loading').classList.add('hidden')
+
+      const btn = document.getElementById('write-feedback-btn')
+      btn.disabled = false
+      btn.textContent = 'Get AI feedback →'
+
+      showScreen('screen-task-write')
+    }
+
+    window.getWriteFeedback = async function() {
+      const input = document.getElementById('write-input').value.trim()
+      if (!input) {
+        document.getElementById('write-input').focus()
+        return
+      }
+
+      const ex  = exchange()
+      const btn = document.getElementById('write-feedback-btn')
+      btn.disabled = true
+      btn.textContent = 'Thinking…'
+      document.getElementById('write-loading').classList.remove('hidden')
+      document.getElementById('write-feedback-box').classList.add('hidden')
+
+      const prompt = `You are a tutor evaluating a high school student's attempt to write Socrates' next question in the dialogue "${dialogue().title}".
+
+Context: ${ex.writeContext}
+
+Ideal Socratic move: ${ex.idealMove}
+
+The student wrote: "${input}"
+
+Evaluate in 3-4 sentences. Cover:
+Does it use a recognizable Socratic move? Name it if so.
+Does it advance the dialogue — push toward a contradiction or a sharper definition?
+One specific suggestion to make it more Socratic.
+End with a rating: Excellent / Good / Needs work.
+Be encouraging but honest. Write as a knowledgeable tutor, not as Socrates himself.`
+
+      try {
+        const res  = await fetch('../api/anthropic-proxy.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 1000,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        })
+
+        const data = await res.json()
+
+        if (!res.ok) {
+          throw new Error(data.error || `HTTP ${res.status}`)
+        }
+
+        const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('')
+
+        let writeScore = 0.5
+        let writeRating = 'Good'
+        if (/excellent/i.test(text))      { writeScore = 1.0; writeRating = 'Excellent' }
+        else if (/needs work/i.test(text)) { writeScore = 0.0; writeRating = 'Needs work' }
+
+        scores.write.push(writeScore)
+        exchangeDetails.push({ studentQuestion: input, aiFeedback: text, writeRating })
+
+        document.getElementById('write-feedback-box').textContent = text
+        document.getElementById('write-feedback-box').classList.remove('hidden')
+        document.getElementById('write-continue-btn').classList.remove('hidden')
+
+      } catch (err) {
+        console.error('Feedback error:', err)
+        scores.write.push(0.5)
+        exchangeDetails.push({ studentQuestion: input, aiFeedback: null, writeRating: 'Good' })
+        const fbBox = document.getElementById('write-feedback-box')
+        fbBox.innerHTML = `<span style="color:var(--error);">Could not get AI feedback (${err.message}). Check that api/config.php has your Anthropic key. Your answer has been recorded.</span>`
+        fbBox.classList.remove('hidden')
+        document.getElementById('write-continue-btn').classList.remove('hidden')
+      } finally {
+        document.getElementById('write-loading').classList.add('hidden')
+        btn.disabled = false
+        btn.textContent = 'Get AI feedback →'
+      }
+    }
+
+    window.continueFromWrite = async function() {
+      exchangeIndex++
+      if (exchangeIndex < total()) {
+        renderReading()
+      } else {
+        await renderResults()
+      }
+    }
+
+    // ── Results ───────────────────────────────────────────────
+    function avg(arr) {
+      return arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 100) : 0
+    }
+
+    async function renderResults() {
+      const mcAvg    = avg(scores.mc)
+      const labelAvg = avg(scores.label)
+      const writeAvg = avg(scores.write)
+      const overall  = Math.round((mcAvg + labelAvg + writeAvg) / 3)
+
+      const color = overall >= 80
+        ? 'var(--on-secondary-container)'
+        : overall >= 60
+          ? 'var(--tertiary)'
+          : 'var(--error)'
+
+      const circumference = 2 * Math.PI * 42  // ≈ 263.89
+      const offset = circumference * (1 - overall / 100)
+
+      document.getElementById('results-title').textContent = dialogue().title
+
+      // Animate ring after a brief paint delay
+      const arc = document.getElementById('results-ring-arc')
+      arc.style.stroke = color
+      arc.setAttribute('stroke-dashoffset', circumference.toFixed(2))
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        arc.setAttribute('stroke-dashoffset', offset.toFixed(2))
+      }))
+
+      document.getElementById('results-score-num').textContent = `${overall}%`
+      document.getElementById('results-score-num').style.color = color
+      document.getElementById('res-mc').textContent    = `${mcAvg}%`
+      document.getElementById('res-label').textContent = `${labelAvg}%`
+      document.getElementById('res-write').textContent = `${writeAvg}%`
+
+      await saveSession(mcAvg, labelAvg, writeAvg, overall)
+      showScreen('screen-results')
+    }
+
+    window.tryAgain = function() {
+      exchangeIndex = 0
+      scores        = { mc: [], label: [], write: [] }
+      renderReading()
+    }
+
+    // ── Init ──────────────────────────────────────────────────
+    renderHome()
+
+  </script>
+  <script src="../js/nav.js"></script>
+</body>
+</html>
