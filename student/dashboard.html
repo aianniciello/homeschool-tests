@@ -8,22 +8,24 @@
 </head>
 <body>
 
-  <nav>
-    <div>
+  <nav class="sidebar">
+    <div class="sidebar-brand">Boring Boxes</div>
+    <div class="sidebar-links">
       <a href="dashboard.html">Dashboard</a>
       <a href="results.html">My Results</a>
+      <a href="profile.html">Profile</a>
     </div>
-    <button class="btn btn-secondary" id="logout-btn" style="width:auto;padding:6px 16px;">Sign Out</button>
+    <div class="sidebar-footer">
+      <div id="nav-user-info" class="sidebar-user"></div>
+      <button id="logout-btn" class="btn-sign-out">Sign Out</button>
+    </div>
   </nav>
+  <script>(function(){const f=location.pathname.split('/').pop();document.querySelectorAll('.sidebar-links a').forEach(a=>{if(a.getAttribute('href')===f)a.classList.add('active')})})()</script>
 
   <div class="page">
     <h2>Welcome, <span id="student-name"></span></h2>
 
-    <h3 style="margin-bottom:16px;">My Assigned Tests</h3>
-
-    <div id="tests-list">
-      <p style="color:#999;">Loading...</p>
-    </div>
+    <div id="tests-list"><p style="color:#999;">Loading...</p></div>
   </div>
 
   <script type="module">
@@ -34,7 +36,19 @@
     document.getElementById('student-name').textContent = profile.full_name || user.email
     document.getElementById('logout-btn').addEventListener('click', logout)
 
-    // Load assigned tests
+    const { data: studentInfo } = await supabase
+      .from('students')
+      .select('schools(name), classes(name)')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const navParts = [
+      'Student: ' + (profile.full_name || user.email),
+      studentInfo?.schools?.name,
+      studentInfo?.classes?.name
+    ].filter(Boolean)
+    document.getElementById('nav-user-info').textContent = navParts.join(' · ')
+
     const { data: assignments } = await supabase
       .from('assignments')
       .select('id, due_date, tests(id, title, description)')
@@ -45,11 +59,48 @@
     if (!assignments || assignments.length === 0) {
       container.innerHTML = '<p style="color:#999;">No tests assigned yet.</p>'
     } else {
-      container.innerHTML = assignments.map(a => `
-        <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
+
+    // Check which assignments have submissions and calculate scores
+    const todo = []
+    const done = []
+
+    for (const a of assignments) {
+      const { data: submissions } = await supabase
+        .from('submissions')
+        .select('question_id, choice_id')
+        .eq('assignment_id', a.id)
+
+      if (!submissions || submissions.length === 0) {
+        todo.push({ assignment: a })
+      } else {
+        // Calculate score
+        const { data: questions } = await supabase
+          .from('questions')
+          .select('id, choices(id, is_correct)')
+          .eq('test_id', a.tests.id)
+
+        let correct = 0
+        for (const sub of submissions) {
+          const q = questions?.find(q => q.id === sub.question_id)
+          if (q?.choices?.some(c => c.id === sub.choice_id && c.is_correct)) correct++
+        }
+
+        const total = questions?.length || 0
+        const percentage = total > 0 ? Math.round((correct / total) * 100) : 0
+        done.push({ assignment: a, correct, total, percentage })
+      }
+    }
+
+    let html = ''
+
+    // Tests to take
+    if (todo.length > 0) {
+      html += `<h3 style="margin-bottom:16px;">Tests To Take</h3>`
+      html += todo.map(({ assignment: a }) => `
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <div>
             <strong>${a.tests?.title || 'Untitled Test'}</strong>
-            ${a.tests?.description ? `<p style="color:#666;margin-top:4px;">${a.tests.description}</p>` : ''}
+            ${a.tests?.description ? `<p style="color:#666;margin-top:4px;font-size:0.9rem;">${a.tests.description}</p>` : ''}
             ${a.due_date ? `<p style="color:#999;font-size:0.85rem;margin-top:4px;">Due: ${new Date(a.due_date).toLocaleDateString()}</p>` : ''}
           </div>
           <a href="test.html?assignment=${a.id}" class="btn" style="width:auto;padding:10px 20px;text-decoration:none;">
@@ -58,6 +109,31 @@
         </div>
       `).join('')
     }
+
+    // Completed tests
+    if (done.length > 0) {
+      html += `<h3 style="margin-top:${todo.length > 0 ? '32px' : '0'};margin-bottom:16px;">Completed Tests</h3>`
+      html += done.map(({ assignment: a, correct, total, percentage }) => `
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div>
+            <strong>${a.tests?.title || 'Untitled Test'}</strong>
+            ${a.tests?.description ? `<p style="color:#666;margin-top:4px;font-size:0.9rem;">${a.tests.description}</p>` : ''}
+            <p style="color:#666;font-size:0.9rem;margin-top:4px;">${correct} / ${total} correct</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:16px;">
+            <span style="font-size:1.4rem;font-weight:700;color:${percentage >= 70 ? '#48bb78' : percentage >= 50 ? '#ed8936' : '#fc8181'}">
+              ${percentage}%
+            </span>
+            <a href="results.html" class="btn btn-secondary" style="width:auto;padding:10px 20px;text-decoration:none;">
+              Review
+            </a>
+          </div>
+        </div>
+      `).join('')
+    }
+
+    container.innerHTML = html
+    } // end else
   </script>
 </body>
 </html>

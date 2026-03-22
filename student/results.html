@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Results</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="sidebar">
+    <div class="sidebar-brand">Boring Boxes</div>
+    <div class="sidebar-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="results.html">My Results</a>
+      <a href="profile.html">Profile</a>
+    </div>
+    <div class="sidebar-footer">
+      <div id="nav-user-info" class="sidebar-user"></div>
+      <button id="logout-btn" class="btn-sign-out">Sign Out</button>
+    </div>
+  </nav>
+  <script>(function(){const f=location.pathname.split('/').pop();document.querySelectorAll('.sidebar-links a').forEach(a=>{if(a.getAttribute('href')===f)a.classList.add('active')})})()</script>
+
+  <div class="page">
+
+    <!-- Overview: list of completed tests -->
+    <div id="overview-view">
+      <h2>My Results</h2>
+      <div id="results-loading" style="color:#666;">Loading...</div>
+      <div id="results-content" class="hidden">
+        <div id="no-results" class="hidden" style="color:#999;margin:40px 0;text-align:center;">
+          You haven't completed any tests yet.
+        </div>
+        <div id="results-list"></div>
+      </div>
+    </div>
+
+    <!-- Detail: one test's answers -->
+    <div id="detail-view" class="hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+        <h2 id="detail-title"></h2>
+        <button class="btn btn-secondary" id="back-btn" style="width:auto;padding:10px 20px;">← Back to Results</button>
+      </div>
+
+      <div class="card" style="text-align:center;margin-bottom:24px;">
+        <div style="font-size:3rem;font-weight:700;color:#4f8ef7;" id="score-display"></div>
+        <div style="color:#666;margin-top:4px;">Your Score</div>
+      </div>
+
+      <div id="answer-list"></div>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { requireAuth, logout } from '../js/auth.js'
+    import { supabase } from '../js/supabase.js'
+
+    const { user, profile } = await requireAuth('student')
+    document.getElementById('logout-btn').addEventListener('click', logout)
+
+    const { data: studentInfo } = await supabase
+      .from('students')
+      .select('schools(name), classes(name)')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const navParts = [
+      'Student: ' + (profile.full_name || user.email),
+      studentInfo?.schools?.name,
+      studentInfo?.classes?.name
+    ].filter(Boolean)
+    document.getElementById('nav-user-info').textContent = navParts.join(' · ')
+
+    // ─── Overview ───────────────────────────────────────────
+
+    async function loadResults() {
+      const { data: assignments } = await supabase
+        .from('assignments')
+        .select('id, test_id, tests(id, title, description)')
+        .eq('student_id', user.id)
+
+      document.getElementById('results-loading').classList.add('hidden')
+      document.getElementById('results-content').classList.remove('hidden')
+
+      if (!assignments || assignments.length === 0) {
+        document.getElementById('no-results').classList.remove('hidden')
+        return
+      }
+
+      // Only show assignments that have submissions
+      const completed = []
+      for (const assignment of assignments) {
+        const { count } = await supabase
+          .from('submissions')
+          .select('*', { count: 'exact', head: true })
+          .eq('assignment_id', assignment.id)
+
+        if (count > 0) {
+          // Calculate score
+          const { data: questions } = await supabase
+            .from('questions')
+            .select('id, choices(id, is_correct)')
+            .eq('test_id', assignment.tests.id)
+
+          const { data: submissions } = await supabase
+            .from('submissions')
+            .select('question_id, choice_id')
+            .eq('assignment_id', assignment.id)
+
+          let correct = 0
+          for (const sub of (submissions || [])) {
+            const q = questions?.find(q => q.id === sub.question_id)
+            if (q?.choices?.some(c => c.id === sub.choice_id && c.is_correct)) correct++
+          }
+
+          const total = questions?.length || 0
+          const percentage = total > 0 ? Math.round((correct / total) * 100) : 0
+
+          completed.push({ assignment, correct, total, percentage })
+        }
+      }
+
+      if (completed.length === 0) {
+        document.getElementById('no-results').classList.remove('hidden')
+        return
+      }
+
+      document.getElementById('results-list').innerHTML = completed.map(({ assignment, correct, total, percentage }) => `
+        <div class="card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <strong>${assignment.tests?.title || 'Untitled Test'}</strong>
+            ${assignment.tests?.description ? `<p style="color:#666;margin-top:4px;font-size:0.9rem;">${assignment.tests.description}</p>` : ''}
+            <p style="color:#666;margin-top:4px;font-size:0.9rem;">${correct} / ${total} correct</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:16px;">
+            <span style="font-size:1.4rem;font-weight:700;color:${percentage >= 70 ? '#48bb78' : percentage >= 50 ? '#ed8936' : '#fc8181'}">
+              ${percentage}%
+            </span>
+            <button class="btn" onclick="viewDetail('${assignment.id}', '${(assignment.tests?.title || 'Test').replace(/'/g, "\\'")}')"
+              style="width:auto;padding:8px 16px;">
+              Review
+            </button>
+          </div>
+        </div>
+      `).join('')
+    }
+
+    loadResults()
+
+    // ─── Detail: one test's answers ──────────────────────────
+
+    window.viewDetail = async function(assignmentId, title) {
+      document.getElementById('overview-view').classList.add('hidden')
+      document.getElementById('detail-view').classList.remove('hidden')
+      document.getElementById('detail-title').textContent = title
+      document.getElementById('score-display').textContent = '...'
+      document.getElementById('answer-list').innerHTML = '<p style="color:#999;">Loading...</p>'
+
+      // Get the test id from the assignment
+      const { data: assignment } = await supabase
+        .from('assignments')
+        .select('test_id')
+        .eq('id', assignmentId)
+        .single()
+
+      const { data: questions } = await supabase
+        .from('questions')
+        .select('id, question_text, position, choices(id, choice_text, is_correct)')
+        .eq('test_id', assignment.test_id)
+        .order('position')
+
+      // Fetch choices separately if the join didn't work
+      if (questions) {
+        for (const q of questions) {
+          if (!q.choices || q.choices.length === 0) {
+            const { data: choices } = await supabase
+              .from('choices')
+              .select('id, choice_text, is_correct')
+              .eq('question_id', q.id)
+            q.choices = choices || []
+          }
+        }
+      }
+
+      const { data: submissions } = await supabase
+        .from('submissions')
+        .select('question_id, choice_id')
+        .eq('assignment_id', assignmentId)
+
+      let correct = 0
+      const answerHtml = (questions || []).map((q, i) => {
+        const sub = submissions?.find(s => s.question_id === q.id)
+        const chosen = q.choices.find(c => c.id === sub?.choice_id)
+        const correctChoice = q.choices.find(c => c.is_correct)
+        const isCorrect = chosen?.is_correct || false
+        if (isCorrect) correct++
+
+        return `
+          <div class="card" style="margin-bottom:12px;border-left:4px solid ${isCorrect ? '#48bb78' : '#fc8181'};">
+            <p style="font-weight:600;margin-bottom:8px;">Q${i + 1}: ${q.question_text}</p>
+            <p>Your answer: <span style="font-weight:600;color:${isCorrect ? '#48bb78' : '#fc8181'}">
+              ${chosen?.choice_text || 'Not answered'}
+            </span> ${isCorrect ? '✓' : '✗'}</p>
+            ${!isCorrect && correctChoice ? `<p style="color:#48bb78;margin-top:4px;">Correct answer: <strong>${correctChoice.choice_text}</strong></p>` : ''}
+          </div>
+        `
+      }).join('')
+
+      const total = questions?.length || 0
+      const percentage = total > 0 ? Math.round((correct / total) * 100) : 0
+      document.getElementById('score-display').textContent = `${percentage}% (${correct}/${total})`
+      document.getElementById('answer-list').innerHTML = answerHtml
+    }
+
+    // ─── Back button ─────────────────────────────────────────
+
+    document.getElementById('back-btn').addEventListener('click', () => {
+      document.getElementById('detail-view').classList.add('hidden')
+      document.getElementById('overview-view').classList.remove('hidden')
+    })
+
+  </script>
+</body>
+</html>

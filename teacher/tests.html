@@ -8,16 +8,22 @@
 </head>
 <body>
 
-  <nav>
-    <div>
+  <nav class="sidebar">
+    <div class="sidebar-brand">Boring Boxes</div>
+    <div class="sidebar-links">
       <a href="dashboard.html">Dashboard</a>
       <a href="students.html">Students</a>
       <a href="tests.html">My Tests</a>
       <a href="catalogue.html">Catalogue</a>
       <a href="results.html">Results</a>
+      <a href="profile.html">Profile</a>
     </div>
-    <button class="btn btn-secondary" id="logout-btn" style="width:auto;padding:6px 16px;">Sign Out</button>
+    <div class="sidebar-footer">
+      <div id="nav-user-info" class="sidebar-user"></div>
+      <button id="logout-btn" class="btn-sign-out">Sign Out</button>
+    </div>
   </nav>
+  <script>(function(){const f=location.pathname.split('/').pop();document.querySelectorAll('.sidebar-links a').forEach(a=>{if(a.getAttribute('href')===f)a.classList.add('active')})})()</script>
 
   <div class="page">
 
@@ -30,9 +36,9 @@
       <table>
         <thead>
           <tr>
-            <th>Title</th>
-            <th>Questions</th>
-            <th>Created</th>
+            <th id="th-title" onclick="sortTestsBy('title')" style="cursor:pointer;user-select:none;">Title<span class="sort-ind"> ↕</span></th>
+            <th id="th-questions" onclick="sortTestsBy('questions')" style="cursor:pointer;user-select:none;">Questions<span class="sort-ind"> ↕</span></th>
+            <th id="th-created" onclick="sortTestsBy('created')" style="cursor:pointer;user-select:none;">Created<span class="sort-ind"> ↓</span></th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -40,13 +46,43 @@
           <tr><td colspan="4" style="text-align:center;color:#999;">Loading...</td></tr>
         </tbody>
       </table>
+
+      <!-- Archived tests -->
+      <div id="archived-toggle" class="hidden" style="margin-top:24px;">
+        <button id="toggle-archived-btn" class="btn btn-secondary" onclick="toggleArchived()" style="width:auto;padding:8px 16px;font-size:0.85rem;"></button>
+      </div>
+      <div id="archived-section" class="hidden" style="margin-top:16px;opacity:0.7;">
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Questions</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="archived-body"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Test Editor View -->
     <div id="editor-view" class="hidden">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
-        <h2 id="editor-title">New Test</h2>
+        <div>
+          <h2 id="editor-title" style="margin-bottom:0;">New Test</h2>
+          <span id="version-note" class="hidden" style="font-size:0.75rem;color:var(--on-surface-variant);margin-top:4px;display:block;">Revised version</span>
+        </div>
         <button class="btn btn-secondary" id="back-btn" style="width:auto;padding:10px 20px;">← Back to Tests</button>
+      </div>
+
+      <!-- Locked banner: shown when students have submitted answers -->
+      <div id="locked-banner" class="hidden" style="background:var(--tertiary-container);border-radius:var(--radius-md);padding:16px 20px;margin-bottom:24px;justify-content:space-between;align-items:center;gap:16px;">
+        <div>
+          <strong style="color:var(--tertiary);">Students have submitted answers for this test.</strong>
+          <p style="color:var(--tertiary);font-size:0.85rem;margin-top:4px;opacity:0.85;">Question editing is disabled to protect existing scores. Create a new version to make changes.</p>
+        </div>
+        <button class="btn btn-secondary" onclick="createNewVersion()" style="width:auto;padding:8px 16px;flex-shrink:0;margin-top:0;">Create New Version</button>
       </div>
 
       <div class="card" style="margin-bottom:24px;">
@@ -73,7 +109,7 @@
 
         <!-- New Question Form -->
         <div class="card hidden" id="question-form">
-          <h4 style="margin-bottom:16px;">New Question</h4>
+          <h4 id="question-form-title" style="margin-bottom:16px;">New Question</h4>
           <div class="form-group">
             <label>Question</label>
             <input type="text" id="q-text" placeholder="e.g. What does 'porta' mean?">
@@ -122,45 +158,186 @@
     import { requireAuth, logout } from '../js/auth.js'
     import { supabase } from '../js/supabase.js'
 
-    const { user } = await requireAuth('teacher')
+    const { user, profile } = await requireAuth('teacher')
     document.getElementById('logout-btn').addEventListener('click', logout)
 
     const { data: school } = await supabase
       .from('schools')
-      .select('id')
+      .select('id, name')
       .eq('teacher_id', user.id)
       .maybeSingle()
 
+    document.getElementById('nav-user-info').textContent =
+      `Teacher: ${profile.full_name} · ${school?.name || ''}`
+
     let currentTestId = null
+    let currentTestIsLocked = false
+    let _testsData = null
+    let _testsSortState = { col: 'created', dir: 'desc' }
+
+    window.sortTestsBy = function(col) {
+      if (_testsSortState.col === col) {
+        _testsSortState.dir = _testsSortState.dir === 'asc' ? 'desc' : 'asc'
+      } else {
+        _testsSortState.col = col
+        _testsSortState.dir = 'asc'
+      }
+      updateTestSortHeaders()
+      renderTests()
+    }
+
+    function updateTestSortHeaders() {
+      ['title', 'questions', 'created'].forEach(col => {
+        const th = document.getElementById(`th-${col}`)
+        if (!th) return
+        th.querySelector('.sort-ind').textContent =
+          _testsSortState.col === col ? (_testsSortState.dir === 'asc' ? ' ↑' : ' ↓') : ' ↕'
+      })
+    }
+
+    let _showArchived = false
+
+    function buildTestRow(t, countMap, assignedTests, takenTests, archived = false) {
+      const qCount = countMap.get(t.id) ?? 0
+      const isAssigned = assignedTests.has(t.id)
+      let badge = ''
+      if (!archived) {
+        if (takenTests.has(t.id)) {
+          badge = `<span style="display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:0.72rem;font-weight:600;background:var(--tertiary-container);color:var(--tertiary);">Taken</span>`
+        } else if (isAssigned) {
+          badge = `<span style="display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:0.72rem;font-weight:600;background:var(--tertiary-container);color:var(--tertiary);opacity:0.65;">Assigned</span>`
+        }
+      }
+      const safeTitle = t.title.replace(/'/g, "\\'")
+      const deleteBtn = !isAssigned
+        ? `<button class="btn btn-secondary" onclick="deleteTest('${t.id}', '${safeTitle}')" style="width:auto;padding:6px 12px;font-size:0.85rem;color:var(--error);">Delete</button>`
+        : ''
+      const actions = archived
+        ? `<div style="display:flex;gap:6px;">${deleteBtn}<button class="btn btn-secondary" onclick="unarchiveTest('${t.id}')" style="width:auto;padding:6px 12px;font-size:0.85rem;">Unarchive</button></div>`
+        : `<div style="display:flex;gap:6px;"><button class="btn" onclick="editTest('${t.id}', '${safeTitle}')" style="width:auto;padding:6px 12px;font-size:0.85rem;">Edit / Assign</button><button class="btn btn-secondary" onclick="archiveTest('${t.id}')" style="width:auto;padding:6px 12px;font-size:0.85rem;">Archive</button>${deleteBtn}</div>`
+      return `<tr><td>${t.title}${badge}</td><td>${qCount}</td><td>${new Date(t.created_at).toLocaleDateString()}</td><td>${actions}</td></tr>`
+    }
+
+    function renderTests() {
+      if (!_testsData) return
+      const { activeTests, archivedTests, countMap, assignedTests, takenTests } = _testsData
+      const tbody = document.getElementById('tests-body')
+
+      if (activeTests.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;">No tests yet. Create one!</td></tr>'
+      } else {
+        const items = activeTests.map(t => ({
+          t,
+          title: t.title.toLowerCase(),
+          questions: countMap.get(t.id) ?? 0,
+          created: t.created_at
+        }))
+        const { col, dir } = _testsSortState
+        items.sort((a, b) => {
+          const av = col === 'questions' ? a.questions : col === 'created' ? a.created : a.title
+          const bv = col === 'questions' ? b.questions : col === 'created' ? b.created : b.title
+          if (av < bv) return dir === 'asc' ? -1 : 1
+          if (av > bv) return dir === 'asc' ? 1 : -1
+          return 0
+        })
+        tbody.innerHTML = items.map(({ t }) => buildTestRow(t, countMap, assignedTests, takenTests)).join('')
+      }
+
+      // Archived toggle button
+      const toggleArea = document.getElementById('archived-toggle')
+      const toggleBtn = document.getElementById('toggle-archived-btn')
+      if (archivedTests.length > 0) {
+        toggleArea.classList.remove('hidden')
+        toggleBtn.textContent = _showArchived
+          ? `Hide Archived (${archivedTests.length})`
+          : `Show Archived (${archivedTests.length})`
+      } else {
+        toggleArea.classList.add('hidden')
+      }
+
+      // Archived section
+      const archivedSection = document.getElementById('archived-section')
+      if (_showArchived && archivedTests.length > 0) {
+        document.getElementById('archived-body').innerHTML =
+          archivedTests.map(t => buildTestRow(t, countMap, assignedTests, takenTests, true)).join('')
+        archivedSection.classList.remove('hidden')
+      } else {
+        archivedSection.classList.add('hidden')
+      }
+    }
+
+    window.toggleArchived = function() {
+      _showArchived = !_showArchived
+      renderTests()
+    }
+
+    window.archiveTest = async function(testId) {
+      await supabase.from('tests').update({ is_archived: true }).eq('id', testId)
+      loadTests()
+    }
+
+    window.unarchiveTest = async function(testId) {
+      await supabase.from('tests').update({ is_archived: false }).eq('id', testId)
+      loadTests()
+    }
+
+    window.deleteTest = async function(testId, title) {
+      if (!confirm(`Delete "${title}"? This cannot be undone.`)) return
+      // Delete questions + choices first (RLS may require this order)
+      const { data: questions } = await supabase.from('questions').select('id').eq('test_id', testId)
+      if (questions && questions.length > 0) {
+        await supabase.from('choices').delete().in('question_id', questions.map(q => q.id))
+        await supabase.from('questions').delete().eq('test_id', testId)
+      }
+      await supabase.from('tests').delete().eq('id', testId)
+      loadTests()
+    }
 
     // Load tests list
     async function loadTests() {
-      const { data: tests } = await supabase
+      const { data: allTests } = await supabase
         .from('tests')
-        .select('id, title, created_at')
+        .select('id, title, created_at, is_archived')
         .eq('school_id', school.id)
         .eq('is_catalogue', false)
         .order('created_at', { ascending: false })
 
       const tbody = document.getElementById('tests-body')
-      if (!tests || tests.length === 0) {
+      if (!allTests || allTests.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;">No tests yet. Create one!</td></tr>'
+        document.getElementById('archived-toggle').classList.add('hidden')
+        document.getElementById('archived-section').classList.add('hidden')
         return
       }
 
-      // Get question counts
-      const counts = await Promise.all(tests.map(t =>
-        supabase.from('questions').select('*', { count: 'exact', head: true }).eq('test_id', t.id)
-      ))
+      const activeTests = allTests.filter(t => !t.is_archived)
+      const archivedTests = allTests.filter(t => t.is_archived)
+      const testIds = allTests.map(t => t.id)
 
-      tbody.innerHTML = tests.map((t, i) => `
-        <tr>
-          <td>${t.title}</td>
-          <td>${counts[i].count ?? 0}</td>
-          <td>${new Date(t.created_at).toLocaleDateString()}</td>
-          <td><button class="btn" onclick="editTest('${t.id}', '${t.title.replace(/'/g, "\\'")}')" style="width:auto;padding:6px 12px;font-size:0.85rem;">Edit / Assign</button></td>
-        </tr>
-      `).join('')
+      const [countResults, { data: allAssignments }] = await Promise.all([
+        Promise.all(allTests.map(t =>
+          supabase.from('questions').select('*', { count: 'exact', head: true }).eq('test_id', t.id)
+        )),
+        supabase.from('assignments').select('id, test_id').in('test_id', testIds)
+      ])
+
+      const countMap = new Map(allTests.map((t, i) => [t.id, countResults[i].count ?? 0]))
+
+      const assignmentIds = allAssignments?.map(a => a.id) || []
+      let submittedSet = new Set()
+      if (assignmentIds.length > 0) {
+        const { data: subs } = await supabase
+          .from('submissions').select('assignment_id').in('assignment_id', assignmentIds)
+        submittedSet = new Set(subs?.map(s => s.assignment_id) || [])
+      }
+
+      const assignedTests = new Set(allAssignments?.map(a => a.test_id) || [])
+      const takenTests = new Set(
+        allAssignments?.filter(a => submittedSet.has(a.id)).map(a => a.test_id) || []
+      )
+
+      _testsData = { activeTests, archivedTests, countMap, assignedTests, takenTests }
+      renderTests()
     }
 
     loadTests()
@@ -168,12 +345,19 @@
     // Show/hide views
     document.getElementById('new-test-btn').addEventListener('click', () => {
       currentTestId = null
+      currentTestIsLocked = false
       document.getElementById('editor-title').textContent = 'New Test'
       document.getElementById('test-title').value = ''
       document.getElementById('test-description').value = ''
       document.getElementById('questions-section').classList.add('hidden')
       document.getElementById('assign-section').classList.add('hidden')
       document.getElementById('questions-list').innerHTML = ''
+      document.getElementById('question-form').classList.add('hidden')
+      const banner = document.getElementById('locked-banner')
+      banner.classList.add('hidden')
+      banner.style.display = ''
+      document.getElementById('version-note').classList.add('hidden')
+      document.getElementById('add-question-btn').classList.remove('hidden')
       document.getElementById('list-view').classList.add('hidden')
       document.getElementById('editor-view').classList.remove('hidden')
     })
@@ -189,9 +373,47 @@
       currentTestId = testId
       document.getElementById('editor-title').textContent = 'Edit Test'
       document.getElementById('test-title').value = title
+      document.getElementById('question-form').classList.add('hidden')
 
-      const { data: test } = await supabase.from('tests').select('description').eq('id', testId).maybeSingle()
+      const { data: test } = await supabase.from('tests').select('description, parent_test_id').eq('id', testId).maybeSingle()
       document.getElementById('test-description').value = test?.description || ''
+
+      // Show version note if this is a revised version
+      const versionNote = document.getElementById('version-note')
+      if (test?.parent_test_id) {
+        versionNote.classList.remove('hidden')
+      } else {
+        versionNote.classList.add('hidden')
+      }
+
+      // Check if any submissions exist for this test (locked)
+      const { data: assignments } = await supabase
+        .from('assignments')
+        .select('id')
+        .eq('test_id', testId)
+
+      let isLocked = false
+      if (assignments && assignments.length > 0) {
+        const assignmentIds = assignments.map(a => a.id)
+        const { count } = await supabase
+          .from('submissions')
+          .select('*', { count: 'exact', head: true })
+          .in('assignment_id', assignmentIds)
+        isLocked = (count || 0) > 0
+      }
+
+      currentTestIsLocked = isLocked
+      const banner = document.getElementById('locked-banner')
+      const addBtn = document.getElementById('add-question-btn')
+      if (isLocked) {
+        banner.classList.remove('hidden')
+        banner.style.display = 'flex'
+        addBtn.classList.add('hidden')
+      } else {
+        banner.classList.add('hidden')
+        banner.style.display = ''
+        addBtn.classList.remove('hidden')
+      }
 
       document.getElementById('list-view').classList.add('hidden')
       document.getElementById('editor-view').classList.remove('hidden')
@@ -249,19 +471,25 @@
       }
 
       list.innerHTML = questions.map((q, i) => {
-        const correct = q.choices?.find(c => c.is_correct)
+        const actions = currentTestIsLocked ? '' : `
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn btn-secondary" onclick="editQuestion('${q.id}')" style="width:auto;padding:4px 12px;font-size:0.8rem;">Edit</button>
+            <button class="btn btn-secondary" onclick="deleteQuestion('${q.id}')" style="width:auto;padding:4px 12px;font-size:0.8rem;color:var(--error);">Delete</button>
+          </div>
+        `
         return `
-          <div class="card" style="margin-bottom:12px;">
+          <div id="q-card-${q.id}" class="card" style="margin-bottom:12px;">
             <strong>Q${i + 1}: ${q.question_text}</strong>
             <ul style="margin-top:8px;padding-left:20px;">
               ${q.choices?.map(c => `<li style="color:${c.is_correct ? 'green' : '#333'}">${c.choice_text}${c.is_correct ? ' ✓' : ''}</li>`).join('') || ''}
             </ul>
+            ${actions}
           </div>
         `
       }).join('')
     }
 
-    // Question form
+    // Question form (new questions only)
     document.getElementById('add-question-btn').addEventListener('click', () => {
       document.getElementById('question-form').classList.remove('hidden')
       document.getElementById('q-text').value = ''
@@ -292,7 +520,6 @@
         return
       }
 
-      // Get next position
       const { count } = await supabase
         .from('questions')
         .select('*', { count: 'exact', head: true })
@@ -315,11 +542,120 @@
       loadQuestions()
     })
 
+    // Edit a question inline
+    window.editQuestion = async function(questionId) {
+      const { data: q } = await supabase
+        .from('questions')
+        .select('id, question_text, choices(id, choice_text, is_correct)')
+        .eq('id', questionId)
+        .maybeSingle()
+
+      const card = document.getElementById(`q-card-${questionId}`)
+      if (!card) return
+
+      const choicesHtml = (q.choices || []).map((c, i) => `
+        <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+          <input type="radio" name="inline-correct-${questionId}" value="${i}" ${c.is_correct ? 'checked' : ''}>
+          <input type="text" class="inline-choice-input" value="${c.choice_text.replace(/"/g, '&quot;')}" style="flex:1;">
+        </div>
+      `).join('')
+
+      card.innerHTML = `
+        <div class="form-group" style="margin-bottom:12px;">
+          <label style="font-size:0.8rem;font-weight:600;margin-bottom:4px;display:block;">Question</label>
+          <input type="text" id="inline-q-text-${questionId}" value="${q.question_text.replace(/"/g, '&quot;')}">
+        </div>
+        <label style="font-size:0.8rem;font-weight:600;">Answer Choices</label>
+        <p style="font-size:0.8rem;color:#666;margin:4px 0 8px;">Select the radio button next to the correct answer.</p>
+        ${choicesHtml}
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn" onclick="saveInlineQuestion('${questionId}')" style="width:auto;padding:6px 14px;">Save</button>
+          <button class="btn btn-secondary" onclick="cancelInlineEdit()" style="width:auto;padding:6px 14px;">Cancel</button>
+        </div>
+      `
+    }
+
+    window.saveInlineQuestion = async function(questionId) {
+      const qText = document.getElementById(`inline-q-text-${questionId}`).value.trim()
+      const choiceInputs = document.querySelectorAll(`#q-card-${questionId} .inline-choice-input`)
+      const correctRadio = document.querySelector(`input[name="inline-correct-${questionId}"]:checked`)
+      const correctIndex = correctRadio ? parseInt(correctRadio.value) : 0
+
+      if (!qText) return
+
+      await supabase.from('questions').update({ question_text: qText }).eq('id', questionId)
+      await supabase.from('choices').delete().eq('question_id', questionId)
+      await supabase.from('choices').insert(
+        Array.from(choiceInputs)
+          .map((input, i) => ({ question_id: questionId, choice_text: input.value.trim(), is_correct: i === correctIndex }))
+          .filter(c => c.choice_text)
+      )
+
+      loadQuestions()
+    }
+
+    window.cancelInlineEdit = function() {
+      loadQuestions()
+    }
+
+    // Delete a question
+    window.deleteQuestion = async function(questionId) {
+      if (!confirm('Delete this question? This cannot be undone.')) return
+      await supabase.from('choices').delete().eq('question_id', questionId)
+      await supabase.from('questions').delete().eq('id', questionId)
+      loadQuestions()
+    }
+
+    // Create a new version of a locked test
+    window.createNewVersion = async function() {
+      const { data: original } = await supabase
+        .from('tests')
+        .select('title, description, school_id')
+        .eq('id', currentTestId)
+        .maybeSingle()
+
+      const { data: newTest } = await supabase
+        .from('tests')
+        .insert({
+          school_id: original.school_id,
+          title: original.title + ' (Revised)',
+          description: original.description,
+          is_catalogue: false,
+          parent_test_id: currentTestId
+        })
+        .select()
+        .single()
+
+      // Copy questions and choices
+      const { data: questions } = await supabase
+        .from('questions')
+        .select('id, question_text, position, choices(id, choice_text, is_correct)')
+        .eq('test_id', currentTestId)
+        .order('position')
+
+      for (const q of (questions || [])) {
+        const { data: newQ } = await supabase
+          .from('questions')
+          .insert({ test_id: newTest.id, question_text: q.question_text, position: q.position })
+          .select()
+          .single()
+
+        if (q.choices && q.choices.length > 0) {
+          await supabase.from('choices').insert(
+            q.choices.map(c => ({ question_id: newQ.id, choice_text: c.choice_text, is_correct: c.is_correct }))
+          )
+        }
+      }
+
+      // Open the new version in the editor
+      await window.editTest(newTest.id, newTest.title)
+    }
+
     // Load students for assignment
     async function loadStudentCheckboxes() {
       const { data: students } = await supabase
         .from('students')
-        .select('id, grade, profiles(full_name)')
+        .select('id, grade, class_id, classes(name), profiles(full_name)')
         .eq('school_id', school.id)
 
       const { data: existing } = await supabase
@@ -335,12 +671,15 @@
         return
       }
 
-      container.innerHTML = students.map(s => `
-        <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <input type="checkbox" value="${s.id}" ${assignedIds.includes(s.id) ? 'checked' : ''}>
-          ${s.profiles?.full_name || s.id} ${s.grade ? `(${s.grade})` : ''}
-        </label>
-      `).join('')
+      container.innerHTML = students.map(s => {
+        const meta = [s.grade, s.classes?.name].filter(Boolean).join(' · ')
+        return `
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <input type="checkbox" value="${s.id}" ${assignedIds.includes(s.id) ? 'checked' : ''}>
+            ${s.profiles?.full_name || s.id}${meta ? ` <span style="color:#999;font-size:0.85rem;">(${meta})</span>` : ''}
+          </label>
+        `
+      }).join('')
     }
 
     // Assign test

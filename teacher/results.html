@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Results</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="sidebar">
+    <div class="sidebar-brand">Boring Boxes</div>
+    <div class="sidebar-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="students.html">Students</a>
+      <a href="tests.html">My Tests</a>
+      <a href="catalogue.html">Catalogue</a>
+      <a href="results.html">Results</a>
+      <a href="profile.html">Profile</a>
+    </div>
+    <div class="sidebar-footer">
+      <div id="nav-user-info" class="sidebar-user"></div>
+      <button id="logout-btn" class="btn-sign-out">Sign Out</button>
+    </div>
+  </nav>
+  <script>(function(){const f=location.pathname.split('/').pop();document.querySelectorAll('.sidebar-links a').forEach(a=>{if(a.getAttribute('href')===f)a.classList.add('active')})})()</script>
+
+  <div class="page">
+
+    <!-- Overview: list of tests -->
+    <div id="overview-view">
+      <h2>Test Results</h2>
+      <div id="results-loading" style="color:#666;">Loading results...</div>
+      <div id="results-content" class="hidden">
+        <div id="no-results" class="hidden" style="color:#666;margin:40px 0;text-align:center;">No completed tests yet.</div>
+        <div id="results-list"></div>
+      </div>
+    </div>
+
+    <!-- Detail: one test, all students -->
+    <div id="detail-view" class="hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+        <h2 id="detail-title"></h2>
+        <button class="btn btn-secondary" id="back-to-overview-btn" style="width:auto;padding:10px 20px;">← Back to Results</button>
+      </div>
+
+      <div class="card" style="margin-bottom:24px;">
+        <h3 id="test-info"></h3>
+        <div id="test-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px;"></div>
+      </div>
+
+      <table id="student-results-table" class="hidden">
+        <thead>
+          <tr>
+            <th id="th-sname" onclick="sortResultsBy('name')" style="cursor:pointer;user-select:none;">Student<span class="sort-ind"> ↕</span></th>
+            <th id="th-sgrade" onclick="sortResultsBy('grade')" style="cursor:pointer;user-select:none;">Grade<span class="sort-ind"> ↕</span></th>
+            <th id="th-sscore" onclick="sortResultsBy('score')" style="cursor:pointer;user-select:none;">Score<span class="sort-ind"> ↕</span></th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="student-results-body"></tbody>
+      </table>
+    </div>
+
+    <!-- Student detail: one student's answers -->
+    <div id="student-view" class="hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+        <h2 id="student-view-title"></h2>
+        <button class="btn btn-secondary" id="back-to-detail-btn" style="width:auto;padding:10px 20px;">← Back to Test Results</button>
+      </div>
+      <div id="student-answer-list"></div>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { requireAuth, logout } from '../js/auth.js'
+    import { supabase } from '../js/supabase.js'
+
+    const { user, profile } = await requireAuth('teacher')
+    document.getElementById('logout-btn').addEventListener('click', logout)
+
+    const { data: school } = await supabase
+      .from('schools')
+      .select('id, name')
+      .eq('teacher_id', user.id)
+      .maybeSingle()
+
+    document.getElementById('nav-user-info').textContent =
+      `Teacher: ${profile.full_name} · ${school?.name || ''}`
+
+    let currentTestId = null
+    let currentTestTitle = null
+    let _detailResults = []
+    let _resultsSortState = { col: 'name', dir: 'asc' }
+
+    window.sortResultsBy = function(col) {
+      if (_resultsSortState.col === col) {
+        _resultsSortState.dir = _resultsSortState.dir === 'asc' ? 'desc' : 'asc'
+      } else {
+        _resultsSortState.col = col
+        _resultsSortState.dir = 'asc'
+      }
+      updateResultsSortHeaders()
+      renderStudentResults()
+    }
+
+    function updateResultsSortHeaders() {
+      ['sname', 'sgrade', 'sscore'].forEach(id => {
+        const th = document.getElementById(`th-${id}`)
+        if (!th) return
+        const col = id.replace('s', '')
+        th.querySelector('.sort-ind').textContent =
+          _resultsSortState.col === col ? (_resultsSortState.dir === 'asc' ? ' ↑' : ' ↓') : ' ↕'
+      })
+    }
+
+    function renderStudentResults() {
+      const { col, dir } = _resultsSortState
+      const sorted = [..._detailResults].sort((a, b) => {
+        const av = col === 'score' ? a.percentage : col === 'grade' ? (a.student?.grade || '') : (a.student?.profiles?.full_name || '')
+        const bv = col === 'score' ? b.percentage : col === 'grade' ? (b.student?.grade || '') : (b.student?.profiles?.full_name || '')
+        if (col === 'score') return dir === 'asc' ? av - bv : bv - av
+        return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+      })
+
+      document.getElementById('student-results-body').innerHTML = sorted.map(r => `
+        <tr>
+          <td>${r.student?.profiles?.full_name || 'Student'}</td>
+          <td>${r.student?.grade || '—'}</td>
+          <td style="font-weight:700;color:${r.percentage >= 70 ? 'var(--on-secondary-container)' : r.percentage >= 50 ? 'var(--tertiary)' : 'var(--error)'}">
+            ${r.percentage}% <span style="font-weight:400;color:var(--on-surface-variant);font-size:0.85rem;">(${r.correct}/${r.total})</span>
+          </td>
+          <td>
+            <div style="display:flex;gap:8px;">
+              <button class="btn" onclick="viewStudent('${r.assignment.id}', '${(r.student?.profiles?.full_name || 'Student').replace(/'/g, "\\'")}')"
+                style="width:auto;padding:6px 12px;font-size:0.85rem;">View Answers</button>
+              <button class="btn btn-secondary" onclick="resetStudent('${r.assignment.id}', '${(r.student?.profiles?.full_name || 'Student').replace(/'/g, "\\'")}')"
+                style="width:auto;padding:6px 12px;font-size:0.85rem;">Reset</button>
+            </div>
+          </td>
+        </tr>
+      `).join('')
+
+      const table = document.getElementById('student-results-table')
+      table.classList.remove('hidden')
+      updateResultsSortHeaders()
+    }
+
+    // ─── Overview ───────────────────────────────────────────
+
+    async function loadResults() {
+      if (!school) {
+        document.getElementById('results-loading').textContent = 'No school found for this teacher.'
+        return
+      }
+
+      const { data: tests } = await supabase
+        .from('tests')
+        .select('id, title, created_at')
+        .eq('school_id', school.id)
+        .eq('is_catalogue', false)
+        .order('created_at', { ascending: false })
+
+      document.getElementById('results-loading').classList.add('hidden')
+      document.getElementById('results-content').classList.remove('hidden')
+
+      if (!tests || tests.length === 0) {
+        document.getElementById('no-results').classList.remove('hidden')
+        return
+      }
+
+      // For each test, get assignments and their submissions
+      const cards = await Promise.all(tests.map(async (test) => {
+        const { data: assignments } = await supabase
+          .from('assignments')
+          .select('id, student_id')
+          .eq('test_id', test.id)
+
+        if (!assignments || assignments.length === 0) return null
+
+        // Check which assignments have submissions
+        const withSubs = await Promise.all(assignments.map(async a => {
+          const { count } = await supabase
+            .from('submissions')
+            .select('*', { count: 'exact', head: true })
+            .eq('assignment_id', a.id)
+          return { ...a, submissionCount: count || 0 }
+        }))
+
+        const completed = withSubs.filter(a => a.submissionCount > 0)
+        if (completed.length === 0) return null
+
+        const { count: questionCount } = await supabase
+          .from('questions')
+          .select('*', { count: 'exact', head: true })
+          .eq('test_id', test.id)
+
+        return { test, completed, questionCount: questionCount || 0 }
+      }))
+
+      const validCards = cards.filter(Boolean)
+
+      if (validCards.length === 0) {
+        document.getElementById('no-results').classList.remove('hidden')
+        return
+      }
+
+      document.getElementById('results-list').innerHTML = validCards.map(({ test, completed, questionCount }) => `
+        <div class="card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <h3 style="margin-bottom:4px;">${test.title}</h3>
+            <p style="color:#666;font-size:0.9rem;">${completed.length} student${completed.length !== 1 ? 's' : ''} completed &nbsp;·&nbsp; ${questionCount} questions</p>
+          </div>
+          <button class="btn" onclick="viewTest('${test.id}', '${test.title.replace(/'/g, "\\'")}')" style="width:auto;padding:8px 16px;">
+            View Results
+          </button>
+        </div>
+      `).join('')
+    }
+
+    loadResults()
+
+    // ─── Test detail: all students ───────────────────────────
+
+    window.viewTest = async function(testId, title) {
+      currentTestId = testId
+      currentTestTitle = title
+
+      document.getElementById('overview-view').classList.add('hidden')
+      document.getElementById('detail-view').classList.remove('hidden')
+      document.getElementById('detail-title').textContent = title
+      document.getElementById('test-info').textContent = title
+      document.getElementById('test-stats').innerHTML = '<p style="color:#999;">Loading...</p>'
+      document.getElementById('student-results-table').classList.add('hidden')
+      document.getElementById('student-results-body').innerHTML = ''
+
+      // Fetch questions with choices
+      const { data: questions } = await supabase
+        .from('questions')
+        .select('id, question_text, position, choices(id, choice_text, is_correct)')
+        .eq('test_id', testId)
+        .order('position')
+
+      // If nested choices didn't come through, fetch separately
+      if (questions) {
+        for (const q of questions) {
+          if (!q.choices || q.choices.length === 0) {
+            const { data: choices } = await supabase
+              .from('choices')
+              .select('id, choice_text, is_correct')
+              .eq('question_id', q.id)
+            q.choices = choices || []
+          }
+        }
+      }
+
+      // Fetch assignments
+      const { data: assignments } = await supabase
+        .from('assignments')
+        .select('id, student_id')
+        .eq('test_id', testId)
+
+      // Fetch students
+      const { data: students } = await supabase
+        .from('students')
+        .select('id, grade, profiles(full_name)')
+        .eq('school_id', school.id)
+
+      // Fetch submissions for each assignment
+      const results = []
+      for (const assignment of (assignments || [])) {
+        const { data: submissions } = await supabase
+          .from('submissions')
+          .select('question_id, choice_id')
+          .eq('assignment_id', assignment.id)
+
+        if (!submissions || submissions.length === 0) continue
+
+        const student = students?.find(s => s.id === assignment.student_id)
+
+        let correct = 0
+        for (const sub of submissions) {
+          const q = questions?.find(q => q.id === sub.question_id)
+          if (q?.choices?.some(c => c.id === sub.choice_id && c.is_correct)) correct++
+        }
+
+        const total = questions?.length || 0
+        const percentage = total > 0 ? Math.round((correct / total) * 100) : 0
+
+        results.push({ assignment, student, submissions, correct, total, percentage })
+      }
+
+      // Stats
+      if (results.length === 0) {
+        document.getElementById('test-stats').innerHTML = '<p style="color:#999;">No submissions yet.</p>'
+        return
+      }
+
+      const avg = Math.round(results.reduce((s, r) => s + r.percentage, 0) / results.length)
+      const high = Math.max(...results.map(r => r.percentage))
+      const low = Math.min(...results.map(r => r.percentage))
+
+      document.getElementById('test-stats').innerHTML = `
+        <div style="text-align:center;">
+          <div style="font-size:2rem;font-weight:700;color:#4f8ef7;">${avg}%</div>
+          <div style="color:#666;font-size:0.9rem;">Average Score</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:2rem;font-weight:700;color:#48bb78;">${high}%</div>
+          <div style="color:#666;font-size:0.9rem;">Highest Score</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:2rem;font-weight:700;color:#fc8181;">${low}%</div>
+          <div style="color:#666;font-size:0.9rem;">Lowest Score</div>
+        </div>
+      `
+
+      // Render sortable student table
+      _detailResults = results
+      _resultsSortState = { col: 'name', dir: 'asc' }
+      renderStudentResults()
+
+      // Store for the student detail view
+      window._currentResults = results
+      window._currentQuestions = questions
+    }
+
+    // ─── Student detail: one student's answers ───────────────
+
+    window.viewStudent = function(assignmentId, studentName) {
+      const result = window._currentResults?.find(r => r.assignment.id === assignmentId)
+      const questions = window._currentQuestions
+
+      if (!result || !questions) return
+
+      document.getElementById('detail-view').classList.add('hidden')
+      document.getElementById('student-view').classList.remove('hidden')
+      document.getElementById('student-view-title').textContent = `${studentName} — Answer Review`
+
+      const submissionMap = {}
+      result.submissions.forEach(s => { submissionMap[s.question_id] = s.choice_id })
+
+      document.getElementById('student-answer-list').innerHTML = questions.map((q, i) => {
+        const chosenId = submissionMap[q.id]
+        const chosenChoice = q.choices.find(c => c.id === chosenId)
+        const correctChoice = q.choices.find(c => c.is_correct)
+        const isCorrect = chosenChoice?.is_correct || false
+
+        return `
+          <div class="card" style="margin-bottom:12px;border-left:4px solid ${isCorrect ? '#48bb78' : '#fc8181'};">
+            <p style="font-weight:600;margin-bottom:10px;">Q${i + 1}: ${q.question_text}</p>
+            <p style="margin-bottom:4px;">
+              Answer: <span style="font-weight:600;color:${isCorrect ? '#48bb78' : '#fc8181'}">
+                ${chosenChoice?.choice_text || 'Not answered'}
+              </span>
+              ${isCorrect ? ' ✓' : ' ✗'}
+            </p>
+            ${!isCorrect && correctChoice ? `
+              <p style="color:#48bb78;">Correct answer: <strong>${correctChoice.choice_text}</strong></p>
+            ` : ''}
+          </div>
+        `
+      }).join('')
+    }
+
+    // ─── Reset a student's test ───────────────────────────────
+
+    window.resetStudent = async function(assignmentId, studentName) {
+      if (!confirm(`Reset ${studentName}'s test? They will be able to take it again.`)) return
+
+      const { error } = await supabase
+        .from('submissions')
+        .delete()
+        .eq('assignment_id', assignmentId)
+
+      if (error) {
+        alert('Something went wrong: ' + error.message)
+        return
+      }
+
+      // Reload the test detail view
+      viewTest(currentTestId, currentTestTitle)
+    }
+
+    // ─── Back buttons ─────────────────────────────────────────
+
+    document.getElementById('back-to-overview-btn').addEventListener('click', () => {
+      document.getElementById('detail-view').classList.add('hidden')
+      document.getElementById('overview-view').classList.remove('hidden')
+      document.getElementById('test-info').textContent = ''
+      document.getElementById('test-stats').innerHTML = ''
+      document.getElementById('student-results-body').innerHTML = ''
+      document.getElementById('student-results-table').classList.add('hidden')
+      _detailResults = []
+    })
+
+    document.getElementById('back-to-detail-btn').addEventListener('click', () => {
+      document.getElementById('student-view').classList.add('hidden')
+      document.getElementById('detail-view').classList.remove('hidden')
+    })
+
+  </script>
+</body>
+</html>

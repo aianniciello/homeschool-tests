@@ -8,13 +8,19 @@
 </head>
 <body>
 
-  <nav>
-    <div>
+  <nav class="sidebar">
+    <div class="sidebar-brand">Boring Boxes</div>
+    <div class="sidebar-links">
       <a href="dashboard.html">Dashboard</a>
       <a href="results.html">My Results</a>
+      <a href="profile.html">Profile</a>
     </div>
-    <button class="btn btn-secondary" id="logout-btn" style="width:auto;padding:6px 16px;">Sign Out</button>
+    <div class="sidebar-footer">
+      <div id="nav-user-info" class="sidebar-user"></div>
+      <button id="logout-btn" class="btn-sign-out">Sign Out</button>
+    </div>
   </nav>
+  <script>(function(){const f=location.pathname.split('/').pop();document.querySelectorAll('.sidebar-links a').forEach(a=>{if(a.getAttribute('href')===f)a.classList.add('active')})})()</script>
 
   <div class="page" style="max-width:700px;">
     <div id="loading">Loading test...</div>
@@ -40,8 +46,21 @@
     import { requireAuth, logout } from '../js/auth.js'
     import { supabase } from '../js/supabase.js'
 
-    const { user } = await requireAuth('student')
+    const { user, profile } = await requireAuth('student')
     document.getElementById('logout-btn').addEventListener('click', logout)
+
+    const { data: studentInfo } = await supabase
+      .from('students')
+      .select('schools(name), classes(name)')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const navParts = [
+      'Student: ' + (profile.full_name || user.email),
+      studentInfo?.schools?.name,
+      studentInfo?.classes?.name
+    ].filter(Boolean)
+    document.getElementById('nav-user-info').textContent = navParts.join(' · ')
 
     const params = new URLSearchParams(window.location.search)
     const assignmentId = params.get('assignment')
@@ -88,17 +107,19 @@
       }
 
       const form = document.getElementById('test-form')
-      form.innerHTML = questions.map((q, i) => `
+      form.innerHTML = questions.map((q, i) => {
+        const shuffled = [...q.choices].sort(() => Math.random() - 0.5)
+        return `
         <div class="card" style="margin-bottom:16px;">
           <p style="font-weight:600;margin-bottom:12px;">Q${i + 1}: ${q.question_text}</p>
-          ${q.choices.map(c => `
+          ${shuffled.map(c => `
             <label style="display:flex;align-items:center;gap:10px;margin-bottom:8px;cursor:pointer;">
               <input type="radio" name="q_${q.id}" value="${c.id}" required>
               <span>${c.choice_text}</span>
             </label>
           `).join('')}
         </div>
-      `).join('')
+      `}).join('')
 
       document.getElementById('loading').classList.add('hidden')
       document.getElementById('test-container').classList.remove('hidden')

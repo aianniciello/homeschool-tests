@@ -61,7 +61,8 @@
         const { error: studentError } = await supabase.from('students').insert({
           id: user.id,
           school_id: invite.school_id,
-          grade: invite.grade || null
+          grade: invite.grade || null,
+          class_id: invite.class_id || null
         })
         if (studentError) throw studentError
 

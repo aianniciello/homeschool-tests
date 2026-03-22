@@ -8,16 +8,22 @@
 </head>
 <body>
 
-  <nav>
-    <div>
+  <nav class="sidebar">
+    <div class="sidebar-brand">Boring Boxes</div>
+    <div class="sidebar-links">
       <a href="dashboard.html">Dashboard</a>
       <a href="students.html">Students</a>
       <a href="tests.html">My Tests</a>
       <a href="catalogue.html">Catalogue</a>
       <a href="results.html">Results</a>
+      <a href="profile.html">Profile</a>
     </div>
-    <button class="btn btn-secondary" id="logout-btn" style="width:auto;padding:6px 16px;">Sign Out</button>
+    <div class="sidebar-footer">
+      <div id="nav-user-info" class="sidebar-user"></div>
+      <button id="logout-btn" class="btn-sign-out">Sign Out</button>
+    </div>
   </nav>
+  <script>(function(){const f=location.pathname.split('/').pop();document.querySelectorAll('.sidebar-links a').forEach(a=>{if(a.getAttribute('href')===f)a.classList.add('active')})})()</script>
 
   <div class="page">
     <h2>Welcome, <span id="teacher-name"></span></h2>
@@ -57,9 +63,12 @@
     // Get school
     const { data: school } = await supabase
       .from('schools')
-      .select('id')
+      .select('id, name')
       .eq('teacher_id', user.id)
       .single()
+
+    document.getElementById('nav-user-info').textContent =
+      `Teacher: ${profile.full_name} · ${school?.name || ''}`
 
     if (school) {
       const [{ count: studentCount }, { count: testCount }, { count: assignmentCount }] = await Promise.all([

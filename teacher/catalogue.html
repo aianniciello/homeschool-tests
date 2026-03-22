@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Catalogue</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <nav class="sidebar">
+    <div class="sidebar-brand">Boring Boxes</div>
+    <div class="sidebar-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="students.html">Students</a>
+      <a href="tests.html">My Tests</a>
+      <a href="catalogue.html">Catalogue</a>
+      <a href="results.html">Results</a>
+      <a href="profile.html">Profile</a>
+    </div>
+    <div class="sidebar-footer">
+      <div id="nav-user-info" class="sidebar-user"></div>
+      <button id="logout-btn" class="btn-sign-out">Sign Out</button>
+    </div>
+  </nav>
+  <script>(function(){const f=location.pathname.split('/').pop();document.querySelectorAll('.sidebar-links a').forEach(a=>{if(a.getAttribute('href')===f)a.classList.add('active')})})()</script>
+
+  <div class="page">
+
+    <!-- View 1: Series list -->
+    <div id="series-view">
+      <h2>Test Catalogue</h2>
+      <p style="color:#666;margin-bottom:24px;">Browse pre-made test series and add tests to your class.</p>
+      <div id="series-loading" style="color:#666;">Loading catalogue...</div>
+      <div id="series-list"></div>
+    </div>
+
+    <!-- View 2: Tests within a series -->
+    <div id="tests-view" class="hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h2 id="series-title"></h2>
+        <div style="display:flex;gap:8px;">
+          <button class="btn" id="copy-all-btn" onclick="copyAllTests()" style="width:auto;padding:10px 20px;">Copy All to My Tests</button>
+          <button class="btn btn-secondary" id="back-to-series-btn" style="width:auto;padding:10px 20px;">← Back to Catalogue</button>
+        </div>
+      </div>
+      <p id="series-description" style="color:#666;margin-bottom:8px;"></p>
+      <p id="copy-all-status" class="hidden" style="color:var(--on-secondary-container);font-size:0.9rem;margin-bottom:16px;font-weight:500;"></p>
+      <div id="tests-list"></div>
+    </div>
+
+    <!-- Preview modal -->
+    <div id="preview-modal" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:none;align-items:center;justify-content:center;">
+      <div style="background:white;border-radius:8px;padding:24px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;margin:20px auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h3 id="preview-title"></h3>
+          <button id="close-preview-btn" style="background:none;border:none;font-size:1.5rem;cursor:pointer;padding:4px 8px;color:#666;">&times;</button>
+        </div>
+        <div id="preview-content"></div>
+        <div style="display:flex;gap:12px;margin-top:24px;">
+          <button class="btn" id="copy-test-btn" style="width:auto;padding:10px 20px;">Add to My Tests</button>
+          <button class="btn btn-secondary" id="cancel-copy-btn" style="width:auto;padding:10px 20px;">Cancel</button>
+        </div>
+        <p id="copy-status" class="hidden" style="margin-top:12px;font-weight:600;"></p>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { requireAuth, logout } from '../js/auth.js'
+    import { supabase } from '../js/supabase.js'
+
+    const { user, profile } = await requireAuth('teacher')
+    document.getElementById('logout-btn').addEventListener('click', logout)
+
+    const { data: school } = await supabase
+      .from('schools')
+      .select('id, name')
+      .eq('teacher_id', user.id)
+      .maybeSingle()
+
+    document.getElementById('nav-user-info').textContent =
+      `Teacher: ${profile.full_name} · ${school?.name || ''}`
+
+    let currentTestId = null
+    let _currentSeriesTests = []
+
+    // ─── View 1: Series list ────────────────────────────────
+
+    async function loadSeries() {
+      const { data: seriesList } = await supabase
+        .from('catalogue_series')
+        .select('id, title, description')
+        .order('sort_order')
+
+      document.getElementById('series-loading').classList.add('hidden')
+
+      if (!seriesList || seriesList.length === 0) {
+        document.getElementById('series-list').innerHTML =
+          '<p style="color:#999;margin:40px 0;text-align:center;">No catalogue series available yet.</p>'
+        return
+      }
+
+      // Get test counts per series
+      const cards = await Promise.all(seriesList.map(async (s) => {
+        const { count } = await supabase
+          .from('tests')
+          .select('*', { count: 'exact', head: true })
+          .eq('series_id', s.id)
+          .eq('is_catalogue', true)
+        return { ...s, testCount: count || 0 }
+      }))
+
+      document.getElementById('series-list').innerHTML = cards.map(s => `
+        <div class="card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <h3 style="margin-bottom:4px;">${s.title}</h3>
+            ${s.description ? `<p style="color:#666;font-size:0.9rem;margin-top:4px;">${s.description}</p>` : ''}
+            <p style="color:#999;font-size:0.85rem;margin-top:4px;">${s.testCount} test${s.testCount !== 1 ? 's' : ''}</p>
+          </div>
+          <button class="btn" onclick="viewSeries('${s.id}', '${s.title.replace(/'/g, "\\'")}', '${(s.description || '').replace(/'/g, "\\'")}')"
+            style="width:auto;padding:8px 20px;">
+            Browse Tests
+          </button>
+        </div>
+      `).join('')
+    }
+
+    loadSeries()
+
+    // ─── View 2: Tests within a series ─────────────────────
+
+    window.viewSeries = async function(seriesId, title, description) {
+      document.getElementById('series-view').classList.add('hidden')
+      document.getElementById('tests-view').classList.remove('hidden')
+      document.getElementById('series-title').textContent = title
+      document.getElementById('series-description').textContent = description
+      document.getElementById('tests-list').innerHTML = '<p style="color:#666;">Loading...</p>'
+
+      const { data: tests } = await supabase
+        .from('tests')
+        .select('id, title, description, sort_order')
+        .eq('series_id', seriesId)
+        .eq('is_catalogue', true)
+        .order('title')
+
+      if (!tests || tests.length === 0) {
+        document.getElementById('tests-list').innerHTML =
+          '<p style="color:#999;">No tests in this series yet.</p>'
+        return
+      }
+
+      // Get question counts
+      const testsWithCounts = await Promise.all(tests.map(async (t) => {
+        const { count } = await supabase
+          .from('questions')
+          .select('*', { count: 'exact', head: true })
+          .eq('test_id', t.id)
+        return { ...t, questionCount: count || 0 }
+      }))
+
+      // Sort by sort_order (nulls last), then by title
+      testsWithCounts.sort((a, b) => {
+        if (a.sort_order == null && b.sort_order == null) return a.title.localeCompare(b.title)
+        if (a.sort_order == null) return 1
+        if (b.sort_order == null) return -1
+        return a.sort_order - b.sort_order
+      })
+
+      _currentSeriesTests = testsWithCounts
+      document.getElementById('copy-all-status').classList.add('hidden')
+      document.getElementById('copy-all-btn').textContent = 'Copy All to My Tests'
+      document.getElementById('copy-all-btn').disabled = false
+
+      document.getElementById('tests-list').innerHTML = testsWithCounts.map(t => `
+        <div class="card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            ${t.sort_order != null ? `<p style="font-size:0.75rem;font-weight:600;color:var(--on-surface-variant);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Lesson ${t.sort_order}</p>` : ''}
+            <strong>${t.title}</strong>
+            ${t.description ? `<p style="color:#666;font-size:0.9rem;margin-top:4px;">${t.description}</p>` : ''}
+            <p style="color:#999;font-size:0.85rem;margin-top:4px;">${t.questionCount} question${t.questionCount !== 1 ? 's' : ''}</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary" onclick="previewTest('${t.id}', '${t.title.replace(/'/g, "\\'")}')"
+              style="width:auto;padding:8px 16px;">Preview</button>
+            <button class="btn" id="add-btn-${t.id}"
+              onclick="copyTestDirect('${t.id}', '${t.title.replace(/'/g, "\\'")}', this)"
+              style="width:auto;padding:8px 16px;">Add to My Tests</button>
+          </div>
+        </div>
+      `).join('')
+    }
+
+    document.getElementById('back-to-series-btn').addEventListener('click', () => {
+      document.getElementById('tests-view').classList.add('hidden')
+      document.getElementById('series-view').classList.remove('hidden')
+      _currentSeriesTests = []
+      const btn = document.getElementById('copy-all-btn')
+      btn.textContent = 'Copy All to My Tests'
+      btn.disabled = false
+      btn.style.background = ''
+      btn.style.color = ''
+    })
+
+    // ─── Preview modal ──────────────────────────────────────
+
+    window.previewTest = async function(testId, title) {
+      currentTestId = testId
+      document.getElementById('preview-title').textContent = title
+      document.getElementById('preview-content').innerHTML = '<p style="color:#999;">Loading...</p>'
+      document.getElementById('copy-status').classList.add('hidden')
+      document.getElementById('copy-test-btn').textContent = 'Add to My Tests'
+      document.getElementById('copy-test-btn').disabled = false
+
+      const modal = document.getElementById('preview-modal')
+      modal.classList.remove('hidden')
+      modal.style.display = 'flex'
+
+      const { data: questions } = await supabase
+        .from('questions')
+        .select('id, question_text, position, choices(id, choice_text, is_correct)')
+        .eq('test_id', testId)
+        .order('position')
+
+      if (questions) {
+        for (const q of questions) {
+          if (!q.choices || q.choices.length === 0) {
+            const { data: choices } = await supabase
+              .from('choices').select('id, choice_text, is_correct').eq('question_id', q.id)
+            q.choices = choices || []
+          }
+        }
+      }
+
+      const questionsHtml = (questions || []).map((q, i) => `
+        <div style="border:1px solid #eee;border-radius:6px;padding:16px;margin:12px 0;">
+          <p style="font-weight:600;margin-bottom:10px;">Q${i + 1}: ${q.question_text}</p>
+          <ul style="list-style:none;padding:0;margin:0;">
+            ${(q.choices || []).map((c, j) => `
+              <li style="padding:3px 0;${c.is_correct ? 'color:#48bb78;font-weight:600;' : 'color:#555;'}">
+                ${String.fromCharCode(65 + j)}. ${c.choice_text}${c.is_correct ? ' ✓' : ''}
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      `).join('')
+
+      document.getElementById('preview-content').innerHTML = `
+        <p style="color:#666;margin-bottom:4px;"><strong>${questions?.length || 0}</strong> questions</p>
+        <div style="max-height:380px;overflow-y:auto;">${questionsHtml}</div>
+      `
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('preview-modal')
+      modal.classList.add('hidden')
+      modal.style.display = 'none'
+    }
+
+    document.getElementById('close-preview-btn').addEventListener('click', closeModal)
+    document.getElementById('cancel-copy-btn').addEventListener('click', closeModal)
+    document.getElementById('preview-modal').addEventListener('click', e => {
+      if (e.target.id === 'preview-modal') closeModal()
+    })
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal() })
+
+    document.getElementById('copy-test-btn').addEventListener('click', async () => {
+      if (currentTestId) {
+        const title = document.getElementById('preview-title').textContent
+        await copyTest(currentTestId, title, document.getElementById('copy-test-btn'))
+      }
+    })
+
+    // ─── Copy all tests in series ───────────────────────────
+
+    window.copyAllTests = async function() {
+      if (!school) { alert('No school found for this teacher account.'); return }
+      if (_currentSeriesTests.length === 0) return
+
+      const btn = document.getElementById('copy-all-btn')
+      const statusEl = document.getElementById('copy-all-status')
+      btn.disabled = true
+      statusEl.classList.remove('hidden')
+
+      let copied = 0
+      for (const t of _currentSeriesTests) {
+        statusEl.textContent = `Copying ${copied + 1} of ${_currentSeriesTests.length}: ${t.title}…`
+        await copyTest(t.id, t.title, { textContent: '', style: {} })
+        copied++
+        // Mark the individual Add button as copied
+        const addBtn = document.getElementById(`add-btn-${t.id}`)
+        if (addBtn) {
+          addBtn.textContent = 'Added!'
+          addBtn.disabled = true
+          addBtn.style.background = 'var(--secondary-container)'
+          addBtn.style.color = 'var(--on-secondary-container)'
+        }
+      }
+
+      statusEl.textContent = `All ${copied} tests added to My Tests.`
+      btn.textContent = 'All Added!'
+      btn.style.background = 'var(--secondary-container)'
+      btn.style.color = 'var(--on-secondary-container)'
+    }
+
+    // ─── Copy logic ─────────────────────────────────────────
+
+    window.copyTestDirect = async function(testId, title, btn) {
+      await copyTest(testId, title, btn)
+    }
+
+    async function copyTest(testId, title, btn) {
+      if (!school) {
+        alert('No school found for this teacher account.')
+        return
+      }
+
+      const originalText = btn.textContent
+      btn.textContent = 'Copying...'
+      btn.disabled = true
+
+      try {
+        // Get original test details
+        const { data: original } = await supabase
+          .from('tests').select('title, description').eq('id', testId).single()
+
+        // Create copy in teacher's school
+        const { data: newTest, error: testError } = await supabase
+          .from('tests')
+          .insert({ school_id: school.id, title: original.title, description: original.description, is_catalogue: false })
+          .select().single()
+
+        if (testError) throw testError
+
+        // Get original questions
+        const { data: origQuestions } = await supabase
+          .from('questions').select('id, question_text, position').eq('test_id', testId).order('position')
+
+        if (origQuestions && origQuestions.length > 0) {
+          // Insert new questions
+          const { data: newQuestions, error: qErr } = await supabase
+            .from('questions')
+            .insert(origQuestions.map(q => ({ test_id: newTest.id, question_text: q.question_text, position: q.position })))
+            .select()
+
+          if (qErr) throw qErr
+
+          // Copy choices for each question
+          for (let i = 0; i < origQuestions.length; i++) {
+            const { data: origChoices } = await supabase
+              .from('choices').select('choice_text, is_correct').eq('question_id', origQuestions[i].id)
+
+            if (origChoices && origChoices.length > 0) {
+              await supabase.from('choices').insert(
+                origChoices.map(c => ({ question_id: newQuestions[i].id, choice_text: c.choice_text, is_correct: c.is_correct }))
+              )
+            }
+          }
+        }
+
+        btn.textContent = 'Added!'
+        btn.style.background = '#48bb78'
+
+        // Show status in modal if it's open
+        const statusEl = document.getElementById('copy-status')
+        statusEl.textContent = `"${title}" added to your tests.`
+        statusEl.style.color = '#48bb78'
+        statusEl.classList.remove('hidden')
+
+        setTimeout(() => {
+          btn.textContent = originalText
+          btn.style.background = ''
+          btn.disabled = false
+          statusEl.classList.add('hidden')
+        }, 3000)
+
+      } catch (err) {
+        console.error(err)
+        btn.textContent = 'Error'
+        btn.style.background = '#fc8181'
+        setTimeout(() => {
+          btn.textContent = originalText
+          btn.style.background = ''
+          btn.disabled = false
+        }, 3000)
+      }
+    }
+
+  </script>
+</body>
+</html>
