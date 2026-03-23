@@ -4,7 +4,83 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Teacher Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
   <link rel="stylesheet" href="../css/style.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <style>
+    .stat-card {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      padding: 24px 28px;
+      box-shadow: 0 8px 32px rgba(12,52,89,0.04);
+    }
+    .stat-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .action-card {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      padding: 16px 18px;
+      box-shadow: 0 8px 32px rgba(12,52,89,0.04);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: var(--on-surface);
+      transition: transform var(--transition), box-shadow var(--transition);
+      margin-bottom: 10px;
+    }
+    .action-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 40px rgba(12,52,89,0.1);
+      text-decoration: none;
+    }
+    .action-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .feed-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid rgba(64,97,137,0.08);
+    }
+    .feed-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .feed-item:first-child { padding-top: 0; }
+    .feed-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: var(--primary-container);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.78rem;
+      color: var(--primary-dim);
+      flex-shrink: 0;
+      font-family: 'Manrope', sans-serif;
+    }
+    @media (max-width: 960px) {
+      #dashboard-bottom { grid-template-columns: 1fr !important; }
+    }
+    @media (max-width: 768px) {
+      #stats-grid { grid-template-columns: 1fr 1fr !important; }
+      .stat-card { padding: 20px; }
+    }
+  </style>
 </head>
 <body>
 
@@ -27,28 +103,95 @@
   <script>(function(){const f=location.pathname.split('/').pop();document.querySelectorAll('.sidebar-links a').forEach(a=>{if(a.getAttribute('href')===f)a.classList.add('active')})})()</script>
 
   <div class="page">
-    <h2>Welcome, <span id="teacher-name"></span></h2>
 
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px;">
-      <div class="card" style="text-align:center;">
-        <div style="font-size:2rem;font-weight:700;" id="student-count">—</div>
-        <div style="color:#666;">Students</div>
+    <!-- Hero -->
+    <div style="margin-bottom:40px;">
+      <p id="hero-eyebrow" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--on-surface-variant);font-weight:600;margin-bottom:10px;"></p>
+      <h1 id="hero-greeting" style="font-size:2rem;font-weight:800;letter-spacing:-0.03em;line-height:1.15;margin-bottom:8px;font-family:'Manrope',sans-serif;">Welcome back.</h1>
+      <p id="hero-subtitle" style="color:var(--on-surface-variant);font-size:0.95rem;margin:0;"></p>
+    </div>
+
+    <!-- Stats -->
+    <div id="stats-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px;">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:var(--primary-container);">
+          <i data-lucide="users" style="width:20px;height:20px;color:var(--primary-dim);"></i>
+        </div>
+        <div style="font-size:2.4rem;font-weight:800;letter-spacing:-0.04em;line-height:1;margin-bottom:6px;font-family:'Manrope',sans-serif;" id="student-count">—</div>
+        <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--on-surface-variant);font-weight:600;">Students</div>
       </div>
-      <div class="card" style="text-align:center;">
-        <div style="font-size:2rem;font-weight:700;" id="test-count">—</div>
-        <div style="color:#666;">Tests Created</div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:var(--secondary-container);">
+          <i data-lucide="file-text" style="width:20px;height:20px;color:var(--on-secondary-container);"></i>
+        </div>
+        <div style="font-size:2.4rem;font-weight:800;letter-spacing:-0.04em;line-height:1;margin-bottom:6px;font-family:'Manrope',sans-serif;" id="test-count">—</div>
+        <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--on-surface-variant);font-weight:600;">Tests Created</div>
       </div>
-      <div class="card" style="text-align:center;">
-        <div style="font-size:2rem;font-weight:700;" id="assignment-count">—</div>
-        <div style="color:#666;">Assignments</div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:var(--tertiary-container);">
+          <i data-lucide="clipboard-list" style="width:20px;height:20px;color:var(--tertiary);"></i>
+        </div>
+        <div style="font-size:2.4rem;font-weight:800;letter-spacing:-0.04em;line-height:1;margin-bottom:6px;font-family:'Manrope',sans-serif;" id="assignment-count">—</div>
+        <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--on-surface-variant);font-weight:600;">Assignments</div>
       </div>
     </div>
 
-    <div class="card">
-      <h3 style="margin-bottom:16px;">Quick Links</h3>
-      <a href="students.html" class="btn" style="width:auto;display:inline-block;margin-right:12px;padding:10px 20px;">Add Students</a>
-      <a href="tests.html" class="btn" style="width:auto;display:inline-block;margin-right:12px;padding:10px 20px;">Create a Test</a>
-      <a href="catalogue.html" class="btn" style="width:auto;display:inline-block;padding:10px 20px;">Browse Catalogue</a>
+    <!-- Bottom: Activity feed + Quick actions -->
+    <div id="dashboard-bottom" style="display:grid;grid-template-columns:1fr 272px;gap:24px;align-items:start;">
+
+      <!-- Activity Feed -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:20px;">
+          <div>
+            <h3 style="margin-bottom:2px;">Recent Activity</h3>
+            <p style="color:var(--on-surface-variant);font-size:0.82rem;margin:0;">Latest student submissions</p>
+          </div>
+          <a href="results.html" style="font-size:0.82rem;color:var(--primary);font-weight:600;text-decoration:none;white-space:nowrap;">View all →</a>
+        </div>
+        <div id="activity-feed"><p style="color:var(--on-surface-variant);font-size:0.9rem;padding:8px 0;">Loading...</p></div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div>
+        <p style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--on-surface-variant);font-weight:600;margin-bottom:14px;">Quick Actions</p>
+        <a href="students.html" class="action-card">
+          <div class="action-icon" style="background:var(--primary-container);">
+            <i data-lucide="user-plus" style="width:17px;height:17px;color:var(--primary-dim);"></i>
+          </div>
+          <div>
+            <div style="font-weight:600;font-size:0.875rem;line-height:1.3;">Add Students</div>
+            <div style="color:var(--on-surface-variant);font-size:0.78rem;margin-top:1px;">Invite to your class</div>
+          </div>
+        </a>
+        <a href="tests.html" class="action-card">
+          <div class="action-icon" style="background:var(--secondary-container);">
+            <i data-lucide="plus-circle" style="width:17px;height:17px;color:var(--on-secondary-container);"></i>
+          </div>
+          <div>
+            <div style="font-weight:600;font-size:0.875rem;line-height:1.3;">Create a Test</div>
+            <div style="color:var(--on-surface-variant);font-size:0.78rem;margin-top:1px;">Build from scratch</div>
+          </div>
+        </a>
+        <a href="catalogue.html" class="action-card">
+          <div class="action-icon" style="background:var(--tertiary-container);">
+            <i data-lucide="book-open" style="width:17px;height:17px;color:var(--tertiary);"></i>
+          </div>
+          <div>
+            <div style="font-weight:600;font-size:0.875rem;line-height:1.3;">Browse Catalogue</div>
+            <div style="color:var(--on-surface-variant);font-size:0.78rem;margin-top:1px;">Ready-made tests</div>
+          </div>
+        </a>
+        <a href="results.html" class="action-card">
+          <div class="action-icon" style="background:var(--surface-high);">
+            <i data-lucide="bar-chart-2" style="width:17px;height:17px;color:var(--on-surface-variant);"></i>
+          </div>
+          <div>
+            <div style="font-weight:600;font-size:0.875rem;line-height:1.3;">View Results</div>
+            <div style="color:var(--on-surface-variant);font-size:0.78rem;margin-top:1px;">Review scores</div>
+          </div>
+        </a>
+      </div>
+
     </div>
   </div>
 
@@ -57,31 +200,162 @@
     import { supabase } from '../js/supabase.js'
 
     const { user, profile } = await requireAuth('teacher')
-
-    document.getElementById('teacher-name').textContent = profile.full_name || user.email
     document.getElementById('logout-btn').addEventListener('click', logout)
 
-    // Get school
+    // Hero greeting
+    const displayName = profile.full_name || user.email
+    const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+    document.getElementById('hero-greeting').textContent = `Welcome back, ${displayName}.`
+
+    // School
     const { data: school } = await supabase
       .from('schools')
       .select('id, name')
       .eq('teacher_id', user.id)
       .single()
 
+    document.getElementById('hero-eyebrow').textContent = `${dateStr}  ·  ${school?.name || ''}`
     document.getElementById('nav-user-info').textContent =
       `Teacher: ${profile.full_name} · ${school?.name || ''}`
 
-    if (school) {
-      const [{ count: studentCount }, { count: testCount }, { count: assignmentCount }] = await Promise.all([
-        supabase.from('students').select('*', { count: 'exact', head: true }).eq('school_id', school.id),
-        supabase.from('tests').select('*', { count: 'exact', head: true }).eq('school_id', school.id),
-        supabase.from('assignments').select('*', { count: 'exact', head: true })
-          .in('test_id', (await supabase.from('tests').select('id').eq('school_id', school.id)).data.map(t => t.id))
-      ])
-      document.getElementById('student-count').textContent = studentCount ?? 0
-      document.getElementById('test-count').textContent = testCount ?? 0
-      document.getElementById('assignment-count').textContent = assignmentCount ?? 0
+    if (school) { await loadDashboard(school, user, profile) }
+    window.lucide?.createIcons()
+
+    async function loadDashboard(school, user, profile) {
+
+    // Fetch tests + students
+    const { data: tests } = await supabase
+      .from('tests')
+      .select('id, title')
+      .eq('school_id', school.id)
+      .eq('is_catalogue', false)
+
+    const testIds = (tests || []).map(t => t.id)
+
+    const [{ data: students }, { data: allAssignments }] = await Promise.all([
+      supabase.from('students').select('id, profiles(full_name)').eq('school_id', school.id),
+      testIds.length > 0
+        ? supabase.from('assignments').select('id, student_id, test_id, current_attempt').in('test_id', testIds)
+        : Promise.resolve({ data: [] })
+    ])
+
+    // Stats
+    document.getElementById('student-count').textContent = students?.length ?? 0
+    document.getElementById('test-count').textContent = tests?.length ?? 0
+    document.getElementById('assignment-count').textContent = allAssignments?.length ?? 0
+
+    const assignmentIds = (allAssignments || []).map(a => a.id)
+
+    if (assignmentIds.length === 0) {
+      renderFeed([])
+      document.getElementById('hero-subtitle').textContent = 'No assignments yet — create a test to get started.'
+    } else {
+
+    // Recent submissions
+    const { data: recentSubs } = await supabase
+      .from('submissions')
+      .select('assignment_id, created_at, attempt')
+      .in('assignment_id', assignmentIds)
+      .order('created_at', { ascending: false })
+      .limit(500)
+
+    // Latest submission per assignment
+    const latestByAssignment = new Map()
+    for (const sub of recentSubs || []) {
+      const existing = latestByAssignment.get(sub.assignment_id)
+      if (!existing || new Date(sub.created_at) > new Date(existing.created_at)) {
+        latestByAssignment.set(sub.assignment_id, { created_at: sub.created_at, attempt: sub.attempt || 1 })
+      }
     }
+
+    // Hero subtitle
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const recentCount = [...latestByAssignment.values()].filter(s => new Date(s.created_at) > oneWeekAgo).length
+    document.getElementById('hero-subtitle').textContent = recentCount === 0
+      ? 'No submissions in the last 7 days.'
+      : `${recentCount} test${recentCount !== 1 ? 's' : ''} submitted in the past week.`
+
+    // Top 8 most recent for feed
+    const topEntries = [...latestByAssignment.entries()]
+      .sort((a, b) => new Date(b[1].created_at) - new Date(a[1].created_at))
+      .slice(0, 8)
+
+    const topAssignmentIds = topEntries.map(([id]) => id)
+
+    const uniqueTestIds = [...new Set(
+      topEntries.map(([id]) => allAssignments.find(a => a.id === id)?.test_id).filter(Boolean)
+    )]
+
+    const [allQuestions, topSubmissions] = await Promise.all([
+      Promise.all(uniqueTestIds.map(tid =>
+        supabase.from('questions').select('id, test_id, choices(id, is_correct)').eq('test_id', tid)
+      )).then(results => results.flatMap(r => r.data || [])),
+      supabase.from('submissions')
+        .select('assignment_id, question_id, choice_id, attempt')
+        .in('assignment_id', topAssignmentIds)
+        .then(r => r.data || [])
+    ])
+
+    const activities = topEntries.map(([id, info]) => {
+      const assignment = allAssignments.find(a => a.id === id)
+      const student = students?.find(s => s.id === assignment?.student_id)
+      const test = tests?.find(t => t.id === assignment?.test_id)
+      const subs = topSubmissions.filter(s => s.assignment_id === id && (s.attempt || 1) === info.attempt)
+      const questions = allQuestions.filter(q => q.test_id === assignment?.test_id)
+
+      let correct = 0
+      for (const sub of subs) {
+        const q = questions.find(q => q.id === sub.question_id)
+        if (q?.choices?.some(c => c.id === sub.choice_id && c.is_correct)) correct++
+      }
+
+      const total = questions.length
+      const pct = total > 0 ? Math.round((correct / total) * 100) : 0
+      return { student, test, created_at: info.created_at, correct, total, pct }
+    }).filter(a => a.student && a.test)
+
+    renderFeed(activities)
+    } // end else
+
+    function renderFeed(items) {
+      const el = document.getElementById('activity-feed')
+      if (items.length === 0) {
+        el.innerHTML = '<p style="color:var(--on-surface-variant);font-size:0.9rem;padding:8px 0;">No submissions yet.</p>'
+        return
+      }
+      el.innerHTML = items.map(a => {
+        const name = a.student.profiles?.full_name || 'Student'
+        const initials = name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+        const scoreColor = a.pct >= 70 ? 'var(--on-secondary-container)' : a.pct >= 50 ? 'var(--tertiary)' : 'var(--error)'
+        const scoreBg = a.pct >= 70 ? 'var(--secondary-container)' : a.pct >= 50 ? 'var(--tertiary-container)' : 'var(--error-container)'
+        return `
+          <div class="feed-item">
+            <div class="feed-avatar">${initials}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:0.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+              <div style="color:var(--on-surface-variant);font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.test.title}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;margin-left:8px;">
+              <div style="font-weight:700;font-size:0.8rem;color:${scoreColor};background:${scoreBg};padding:2px 9px;border-radius:999px;display:inline-block;">${a.pct}%</div>
+              <div style="color:var(--on-surface-variant);font-size:0.75rem;margin-top:3px;">${timeAgo(a.created_at)}</div>
+            </div>
+          </div>
+        `
+      }).join('')
+    }
+
+    function timeAgo(dateStr) {
+      const diff = Date.now() - new Date(dateStr).getTime()
+      const m = Math.floor(diff / 60000)
+      const h = Math.floor(diff / 3600000)
+      const d = Math.floor(diff / 86400000)
+      if (m < 2) return 'just now'
+      if (m < 60) return `${m}m ago`
+      if (h < 24) return `${h}h ago`
+      if (d === 1) return 'yesterday'
+      return `${d}d ago`
+    }
+    } // end loadDashboard
   </script>
   <script src="../js/nav.js"></script>
 </body>

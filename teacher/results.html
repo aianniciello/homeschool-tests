@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Test Results</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
   <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
@@ -259,7 +260,7 @@
       // Fetch assignments
       const { data: assignments } = await supabase
         .from('assignments')
-        .select('id, student_id')
+        .select('id, student_id, current_attempt')
         .eq('test_id', testId)
 
       // Fetch students
@@ -275,6 +276,7 @@
           .from('submissions')
           .select('question_id, choice_id')
           .eq('assignment_id', assignment.id)
+          .eq('attempt', assignment.current_attempt || 1)
 
         if (!submissions || submissions.length === 0) continue
 
@@ -329,7 +331,7 @@
 
     // ─── Student detail: one student's answers ───────────────
 
-    window.viewStudent = function(assignmentId, studentName) {
+    window.viewStudent = async function(assignmentId, studentName) {
       const result = window._currentResults?.find(r => r.assignment.id === assignmentId)
       const questions = window._currentQuestions
 
@@ -339,10 +341,13 @@
       document.getElementById('student-view').classList.remove('hidden')
       document.getElementById('student-view-title').textContent = `${studentName} — Answer Review`
 
+      const currentAttempt = result.assignment.current_attempt || 1
+
+      // Current attempt answers
       const submissionMap = {}
       result.submissions.forEach(s => { submissionMap[s.question_id] = s.choice_id })
 
-      document.getElementById('student-answer-list').innerHTML = questions.map((q, i) => {
+      const answersHtml = questions.map((q, i) => {
         const chosenId = submissionMap[q.id]
         const chosenChoice = q.choices.find(c => c.id === chosenId)
         const correctChoice = q.choices.find(c => c.is_correct)
@@ -363,24 +368,70 @@
           </div>
         `
       }).join('')
+
+      // Fetch all submissions across all attempts for history
+      let historyHtml = ''
+      if (currentAttempt > 1) {
+        const { data: allSubs } = await supabase
+          .from('submissions')
+          .select('question_id, choice_id, attempt')
+          .eq('assignment_id', assignmentId)
+          .order('attempt')
+
+        const pastAttempts = []
+        for (let a = 1; a < currentAttempt; a++) {
+          const subs = (allSubs || []).filter(s => (s.attempt || 1) === a)
+          if (subs.length === 0) continue
+          const subMap = {}
+          subs.forEach(s => { subMap[s.question_id] = s.choice_id })
+          let correct = 0
+          for (const q of questions) {
+            if (q.choices?.some(c => c.id === subMap[q.id] && c.is_correct)) correct++
+          }
+          const pct = Math.round((correct / questions.length) * 100)
+          pastAttempts.push({ attempt: a, correct, total: questions.length, pct })
+        }
+
+        if (pastAttempts.length > 0) {
+          historyHtml = `
+            <h3 style="margin:28px 0 12px;">Previous Attempts</h3>
+            ${pastAttempts.map(a => `
+              <div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                <span style="color:var(--on-surface-variant);">Attempt ${a.attempt}</span>
+                <span style="font-weight:700;color:${a.pct >= 70 ? 'var(--on-secondary-container)' : a.pct >= 50 ? 'var(--tertiary)' : 'var(--error)'}">
+                  ${a.pct}% <span style="font-weight:400;color:var(--on-surface-variant);font-size:0.85rem;">(${a.correct}/${a.total})</span>
+                </span>
+              </div>
+            `).join('')}
+          `
+        }
+      }
+
+      document.getElementById('student-answer-list').innerHTML = `
+        ${currentAttempt > 1 ? `<p style="color:var(--on-surface-variant);font-size:0.875rem;margin-bottom:16px;">Showing Attempt ${currentAttempt}</p>` : ''}
+        ${answersHtml}
+        ${historyHtml}
+      `
     }
 
     // ─── Reset a student's test ───────────────────────────────
 
     window.resetStudent = async function(assignmentId, studentName) {
-      if (!confirm(`Reset ${studentName}'s test? They will be able to take it again.`)) return
+      if (!confirm(`Reset ${studentName}'s test? They will be able to retake it. Their previous score will still be visible to you.`)) return
+
+      const result = _detailResults.find(r => r.assignment.id === assignmentId)
+      const nextAttempt = (result?.assignment.current_attempt || 1) + 1
 
       const { error } = await supabase
-        .from('submissions')
-        .delete()
-        .eq('assignment_id', assignmentId)
+        .from('assignments')
+        .update({ current_attempt: nextAttempt })
+        .eq('id', assignmentId)
 
       if (error) {
         alert('Something went wrong: ' + error.message)
         return
       }
 
-      // Reload the test detail view
       viewTest(currentTestId, currentTestTitle)
     }
 

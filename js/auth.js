@@ -37,5 +37,10 @@ export async function requireAuth(role) {
     window.location.href = '/index.html'
     return null
   }
+  // Pending teachers cannot access the app
+  if (profile.role === 'teacher' && profile.status === 'pending') {
+    window.location.href = '/index.html'
+    return null
+  }
   return { user, profile }
 }

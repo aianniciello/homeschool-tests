@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Take Test</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
   <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
@@ -72,7 +73,7 @@
     // Load assignment and test
     const { data: assignment } = await supabase
       .from('assignments')
-      .select('id, test_id, tests(id, title, description)')
+      .select('id, test_id, current_attempt, tests(id, title, description)')
       .eq('id', assignmentId)
       .eq('student_id', user.id)
       .maybeSingle()
@@ -81,11 +82,12 @@
       window.location.href = '/student/dashboard.html'
     }
 
-    // Check if already submitted
+    // Check if already submitted for current attempt
     const { data: existing } = await supabase
       .from('submissions')
       .select('id')
       .eq('assignment_id', assignmentId)
+      .eq('attempt', assignment.current_attempt || 1)
       .limit(1)
 
     if (existing && existing.length > 0) {
@@ -135,7 +137,7 @@
             errorMsg.classList.remove('hidden')
             return
           }
-          answers.push({ assignment_id: assignmentId, question_id: q.id, choice_id: selected.value })
+          answers.push({ assignment_id: assignmentId, question_id: q.id, choice_id: selected.value, attempt: assignment.current_attempt || 1 })
         }
 
         const { error } = await supabase.from('submissions').insert(answers)
@@ -163,6 +165,7 @@
         .from('submissions')
         .select('question_id, choice_id')
         .eq('assignment_id', assignmentId)
+        .eq('attempt', assignment.current_attempt || 1)
 
       let correct = 0
       const reviewHtml = questions.map((q, i) => {

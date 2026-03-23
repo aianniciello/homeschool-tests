@@ -1,6 +1,13 @@
 // Mobile nav — injects hamburger button + backdrop, handles toggle
 // Loaded on all pages that have a .sidebar
 
+// Apply saved theme immediately to avoid flash
+;(function () {
+  if (localStorage.getItem('theme') === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark')
+  }
+})()
+
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.querySelector('.sidebar')) return
 
@@ -45,4 +52,24 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeNav()
   })
+
+  // Dark mode toggle — inject before logout button
+  const logoutBtn = document.getElementById('logout-btn')
+  if (logoutBtn) {
+    const darkBtn = document.createElement('button')
+    darkBtn.className = 'btn-sign-out'
+    const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark'
+    darkBtn.textContent = isDark() ? '☀ Light Mode' : '☾ Dark Mode'
+    logoutBtn.parentNode.insertBefore(darkBtn, logoutBtn)
+    darkBtn.addEventListener('click', () => {
+      if (isDark()) {
+        document.documentElement.removeAttribute('data-theme')
+        localStorage.removeItem('theme')
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        localStorage.setItem('theme', 'dark')
+      }
+      darkBtn.textContent = isDark() ? '☀ Light Mode' : '☾ Dark Mode'
+    })
+  }
 })

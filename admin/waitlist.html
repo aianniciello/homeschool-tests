@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waitlist — Admin</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .status-pending {
+      background: var(--tertiary-container);
+      color: var(--tertiary);
+    }
+    .status-active {
+      background: var(--secondary-container);
+      color: var(--on-secondary-container);
+    }
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .filter-btn {
+      padding: 6px 16px;
+      border-radius: var(--radius-md);
+      border: none;
+      font-size: 0.82rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition);
+      background: var(--surface-high);
+      color: var(--on-surface-variant);
+    }
+    .filter-btn.active {
+      background: var(--primary-container);
+      color: var(--primary-dim);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page" style="max-width:900px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;">
+      <div>
+        <h2 style="margin-bottom:2px;">Waitlist</h2>
+        <p style="color:var(--on-surface-variant);font-size:0.85rem;margin:0;">Teacher beta registration requests</p>
+      </div>
+      <button id="logout-btn" class="btn-sign-out" style="width:auto;">Sign Out</button>
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-btn active" id="filter-pending">Pending</button>
+      <button class="filter-btn" id="filter-all">All</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Requested</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="waitlist-body">
+        <tr><td colspan="5" style="text-align:center;color:#999;">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    import { requireAuth, logout } from '../js/auth.js'
+    import { supabase } from '../js/supabase.js'
+
+    const { user } = await requireAuth('admin')
+    document.getElementById('logout-btn').addEventListener('click', logout)
+
+    let _allTeachers = []
+    let _filter = 'pending'
+
+    async function loadWaitlist() {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, status, created_at')
+        .eq('role', 'teacher')
+        .order('created_at', { ascending: false })
+
+      _allTeachers = data || []
+      renderTable()
+    }
+
+    function renderTable() {
+      const rows = _filter === 'pending'
+        ? _allTeachers.filter(t => t.status === 'pending' || !t.status)
+        : _allTeachers
+
+      const tbody = document.getElementById('waitlist-body')
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#999;">${_filter === 'pending' ? 'No pending registrations.' : 'No teachers yet.'}</td></tr>`
+        return
+      }
+
+      tbody.innerHTML = rows.map(t => {
+        const isPending = t.status === 'pending' || !t.status
+        const statusPill = isPending
+          ? `<span class="status-pill status-pending">Pending</span>`
+          : `<span class="status-pill status-active">Active</span>`
+        const actions = isPending
+          ? `<button class="btn" onclick="approveTeacher('${t.id}', '${t.email.replace(/'/g, "\\'")}')" style="width:auto;padding:5px 14px;font-size:0.82rem;">Approve</button>`
+          : `<span style="color:var(--on-surface-variant);font-size:0.82rem;">—</span>`
+        return `
+          <tr>
+            <td>${t.full_name || '—'}</td>
+            <td>${t.email}</td>
+            <td>${new Date(t.created_at).toLocaleDateString()}</td>
+            <td>${statusPill}</td>
+            <td>${actions}</td>
+          </tr>
+        `
+      }).join('')
+    }
+
+    window.approveTeacher = async function(userId, email) {
+      const btn = event.target
+      btn.textContent = 'Approving…'
+      btn.disabled = true
+
+      try {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ status: 'active' })
+          .eq('id', userId)
+
+        if (updateError) throw updateError
+
+        // Send magic link as approval email — teacher clicks it and lands on dashboard
+        await supabase.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: `${window.location.origin}/teacher/dashboard.html` }
+        })
+
+        await loadWaitlist()
+      } catch (err) {
+        alert('Error: ' + err.message)
+        btn.textContent = 'Approve'
+        btn.disabled = false
+      }
+    }
+
+    // Filter buttons
+    document.getElementById('filter-pending').addEventListener('click', () => {
+      _filter = 'pending'
+      document.getElementById('filter-pending').classList.add('active')
+      document.getElementById('filter-all').classList.remove('active')
+      renderTable()
+    })
+
+    document.getElementById('filter-all').addEventListener('click', () => {
+      _filter = 'all'
+      document.getElementById('filter-all').classList.add('active')
+      document.getElementById('filter-pending').classList.remove('active')
+      renderTable()
+    })
+
+    loadWaitlist()
+  </script>
+</body>
+</html>

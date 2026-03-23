@@ -441,6 +441,33 @@ tbody tr:last-child td {
   -webkit-backdrop-filter: blur(2px);
 }
 
+/* ─── Dark Mode ─────────────────────────────────────────── */
+[data-theme="dark"] {
+  --surface:              #111827;
+  --surface-low:          #1a2537;
+  --surface-high:         #243447;
+  --surface-card:         #1a2840;
+
+  --primary:              #7db4e8;
+  --primary-dim:          #5a96d4;
+  --primary-container:    #1c3a5c;
+  --on-primary:           #0a1929;
+  --on-primary-container: #a8d4fc;
+
+  --secondary-container:     #14432e;
+  --on-secondary-container:  #5edc92;
+
+  --tertiary:             #f5c060;
+  --tertiary-container:   #3d2e00;
+
+  --on-surface:           #d0e4f5;
+  --on-surface-variant:   #7aaec8;
+
+  --error:                #ff8a7a;
+  --error-container:      #4a0f0f;
+  --on-error-container:   #ffb4ab;
+}
+
 /* ─── Responsive ─────────────────────────────────────────── */
 @media (max-width: 768px) {
   /* Sidebar off-screen by default */

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Profile</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
   <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
@@ -35,26 +36,24 @@
         <label>Full Name</label>
         <input type="text" id="full-name">
       </div>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:0;">
         <label>Email</label>
         <input type="email" id="email">
         <p style="font-size:0.8rem;color:#999;margin-top:4px;">Changing your email will send a confirmation link to the new address.</p>
       </div>
-      <button class="btn" id="save-profile-btn" style="width:auto;padding:10px 20px;">Save Changes</button>
-      <p id="profile-error" class="error hidden"></p>
-      <p id="profile-success" class="hidden" style="color:green;margin-top:12px;"></p>
     </div>
 
-    <div class="card" style="margin-top:24px;">
+    <div class="card">
       <h3 style="margin-bottom:20px;">School</h3>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:0;">
         <label>School Name</label>
         <input type="text" id="school-name">
       </div>
-      <button class="btn" id="save-school-btn" style="width:auto;padding:10px 20px;">Save School Name</button>
-      <p id="school-error" class="error hidden"></p>
-      <p id="school-success" class="hidden" style="color:green;margin-top:12px;"></p>
     </div>
+
+    <button class="btn" id="save-btn" style="width:auto;padding:10px 24px;">Save Changes</button>
+    <p id="save-error" class="error hidden"></p>
+    <p id="save-success" class="hidden" style="color:green;margin-top:12px;"></p>
   </div>
 
   <script type="module">
@@ -77,68 +76,45 @@
     document.getElementById('email').value = user.email || ''
     document.getElementById('school-name').value = school?.name || ''
 
-    document.getElementById('save-profile-btn').addEventListener('click', async () => {
-      const name = document.getElementById('full-name').value.trim()
+    document.getElementById('save-btn').addEventListener('click', async () => {
+      const fullName = document.getElementById('full-name').value.trim()
       const email = document.getElementById('email').value.trim()
-      const errorMsg = document.getElementById('profile-error')
-      const successMsg = document.getElementById('profile-success')
+      const schoolName = document.getElementById('school-name').value.trim()
+      const errorMsg = document.getElementById('save-error')
+      const successMsg = document.getElementById('save-success')
 
-      if (!name) {
+      if (!fullName) {
         errorMsg.textContent = 'Name is required.'
         errorMsg.classList.remove('hidden')
         return
       }
-
-      try {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ full_name: name })
-          .eq('id', user.id)
-        if (profileError) throw profileError
-
-        if (email && email !== user.email) {
-          const { error: emailError } = await supabase.auth.updateUser({ email })
-          if (emailError) throw emailError
-          successMsg.textContent = 'Name saved! Check your new email address for a confirmation link.'
-        } else {
-          successMsg.textContent = 'Profile saved!'
-        }
-
-        errorMsg.classList.add('hidden')
-        successMsg.classList.remove('hidden')
-        document.getElementById('nav-user-info').textContent =
-          `Teacher: ${name} · ${school?.name || ''}`
-        setTimeout(() => successMsg.classList.add('hidden'), 4000)
-      } catch (err) {
-        errorMsg.textContent = err.message
-        errorMsg.classList.remove('hidden')
-      }
-    })
-
-    document.getElementById('save-school-btn').addEventListener('click', async () => {
-      const name = document.getElementById('school-name').value.trim()
-      const errorMsg = document.getElementById('school-error')
-      const successMsg = document.getElementById('school-success')
-
-      if (!name) {
+      if (!schoolName) {
         errorMsg.textContent = 'School name is required.'
         errorMsg.classList.remove('hidden')
         return
       }
 
       try {
-        const { error } = await supabase
-          .from('schools')
-          .update({ name })
-          .eq('id', school.id)
-        if (error) throw error
+        const saves = [
+          supabase.from('profiles').update({ full_name: fullName }).eq('id', user.id),
+          supabase.from('schools').update({ name: schoolName }).eq('id', school.id)
+        ]
+        if (email && email !== user.email) {
+          saves.push(supabase.auth.updateUser({ email }))
+        }
 
-        school.name = name
-        successMsg.textContent = 'School name saved!'
+        const results = await Promise.all(saves)
+        const failed = results.find(r => r.error)
+        if (failed) throw failed.error
+
+        school.name = schoolName
         errorMsg.classList.add('hidden')
+        successMsg.textContent = email && email !== user.email
+          ? 'Saved! Check your new email address for a confirmation link.'
+          : 'Changes saved!'
         successMsg.classList.remove('hidden')
         document.getElementById('nav-user-info').textContent =
-          `Teacher: ${document.getElementById('full-name').value.trim()} · ${name}`
+          `Teacher: ${fullName} · ${schoolName}`
         setTimeout(() => successMsg.classList.add('hidden'), 4000)
       } catch (err) {
         errorMsg.textContent = err.message
