@@ -284,8 +284,7 @@
       const profile = await getProfile(user.id)
       if (!profile) return
       if (profile.status === 'pending') { setPendingView(user.email); return }
-      if (profile.role === 'admin') window.location.href = '/admin/waitlist.html'
-      else if (profile.role === 'teacher') window.location.href = '/teacher/dashboard.html'
+      if (profile.role === 'teacher' || profile.role === 'admin') window.location.href = '/teacher/dashboard.html'
       else window.location.href = '/student/dashboard.html'
     })
 
@@ -354,8 +353,7 @@
         const profile = await getProfile(user.id)
         if (!profile) throw new Error('Account not found.')
         if (profile.status === 'pending') { setPendingView(email); return }
-        if (profile.role === 'admin') window.location.href = '/admin/waitlist.html'
-        else if (profile.role === 'teacher') window.location.href = '/teacher/dashboard.html'
+        if (profile.role === 'teacher' || profile.role === 'admin') window.location.href = '/teacher/dashboard.html'
         else window.location.href = '/student/dashboard.html'
       } catch (err) {
         showError(errorMsg, err.message)

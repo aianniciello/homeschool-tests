@@ -53,6 +53,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape') closeNav()
   })
 
+  // Admin link — only show for admin role (role cached in sessionStorage by auth.js)
+  if (sessionStorage.getItem('userRole') === 'admin') {
+    const sidebarLinks = document.querySelector('.sidebar-links')
+    if (sidebarLinks) {
+      const adminLink = document.createElement('a')
+      adminLink.href = '/admin/waitlist.html'
+      adminLink.textContent = 'Admin'
+      adminLink.style.cssText = 'color:var(--tertiary);font-weight:700;'
+      sidebarLinks.appendChild(adminLink)
+      adminLink.addEventListener('click', closeNav)
+    }
+  }
+
   // Dark mode toggle — inject before logout button
   const logoutBtn = document.getElementById('logout-btn')
   if (logoutBtn) {

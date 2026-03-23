@@ -7,6 +7,7 @@ export async function login(email, password) {
 }
 
 export async function logout() {
+  sessionStorage.removeItem('userRole')
   await supabase.auth.signOut()
   window.location.href = '/index.html'
 }
@@ -33,7 +34,9 @@ export async function requireAuth(role) {
     return null
   }
   const profile = await getProfile(user.id)
-  if (!profile || (role && profile.role !== role)) {
+  // Admin can access teacher pages too
+  const effectiveRole = profile?.role === 'admin' ? 'teacher' : profile?.role
+  if (!profile || (role && effectiveRole !== role)) {
     window.location.href = '/index.html'
     return null
   }
@@ -42,5 +45,6 @@ export async function requireAuth(role) {
     window.location.href = '/index.html'
     return null
   }
+  sessionStorage.setItem('userRole', profile.role)
   return { user, profile }
 }
