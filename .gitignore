@@ -4,5 +4,8 @@ api/config.php
 # Local dev only
 dev-server.js
 
+# VS Code SFTP config (contains credentials)
+.vscode/sftp.json
+
 # macOS
 .DS_Store
