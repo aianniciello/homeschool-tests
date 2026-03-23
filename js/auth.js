@@ -34,9 +34,11 @@ export async function requireAuth(role) {
     return null
   }
   const profile = await getProfile(user.id)
-  // Admin can access teacher pages too
-  const effectiveRole = profile?.role === 'admin' ? 'teacher' : profile?.role
-  if (!profile || (role && effectiveRole !== role)) {
+  // Admin can access teacher pages and admin pages
+  const allowed = !role
+    || profile?.role === role
+    || (role === 'teacher' && profile?.role === 'admin')
+  if (!profile || !allowed) {
     window.location.href = '/index.html'
     return null
   }
