@@ -68,6 +68,7 @@
       .from('assignments')
       .select('id, due_date, current_attempt, tests(id, title, description)')
       .eq('student_id', user.id)
+      .eq('content_type', 'test')
 
     const container = document.getElementById('tests-list')
 

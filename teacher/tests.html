@@ -714,7 +714,8 @@
 
       if (toAdd.length > 0) {
         await supabase.from('assignments').insert(toAdd.map(student_id => ({
-          test_id: currentTestId, student_id, school_id: school.id, due_date: dueDates[student_id]
+          test_id: currentTestId, content_type: 'test', content_id: currentTestId,
+          student_id, school_id: school.id, due_date: dueDates[student_id]
         })))
       }
 
