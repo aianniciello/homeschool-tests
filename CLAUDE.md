@@ -102,6 +102,39 @@ Keep `docs/backlog.md` structured like this:
 ### ✅ Done
 - [x] Completed item
 
+## Deployment
+
+**Production URL**: https://app.boringboxes.com
+**Host**: DreamHost shared hosting — `iad1-shared-b8-45.dreamhost.com`
+**User**: `anthonyi`
+**Remote path**: `/home/anthonyi/app.boringboxes.com`
+
+### Deploy Steps
+
+1. Commit and push to GitHub first:
+   ```
+   git add <files>
+   git commit -m "message"
+   git push origin main
+   ```
+
+2. Upload to DreamHost via SFTP (requires `sshpass` — install with `brew install sshpass`):
+   ```bash
+   sshpass -p 'PASSWORD' sftp -o StrictHostKeyChecking=no anthonyi@iad1-shared-b8-45.dreamhost.com <<'EOF'
+   put -r css /home/anthonyi/app.boringboxes.com/
+   put -r img /home/anthonyi/app.boringboxes.com/
+   put -r js /home/anthonyi/app.boringboxes.com/
+   put -r student /home/anthonyi/app.boringboxes.com/
+   put -r teacher /home/anthonyi/app.boringboxes.com/
+   put index.html /home/anthonyi/app.boringboxes.com/
+   put api/anthropic-proxy.php /home/anthonyi/app.boringboxes.com/api/
+   put api/config.php /home/anthonyi/app.boringboxes.com/api/
+   EOF
+   ```
+
+**Note**: `api/config.php` (Anthropic API key) is gitignored — always upload it manually as part of deploy.
+SFTP credentials are in `.vscode/sftp.json` (also gitignored).
+
 ## Session Start
 
 At the start of each session, read `docs/backlog.md` and give me a brief summary of what's in progress and what's up next.
