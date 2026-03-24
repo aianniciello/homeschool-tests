@@ -18,6 +18,7 @@
       <a href="catalogue.html">Catalogue</a>
       <a href="results.html">Results</a>
       <a href="socratic.html">Socratic</a>
+      <a href="supplements.html">Supplements</a>
       <a href="profile.html">Profile</a>
     </div>
     <div class="sidebar-footer">
@@ -80,14 +81,14 @@
     <!-- Filters -->
     <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
       <input type="text" id="filter-search" placeholder="Search name or email…"
-        style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;">
+        style="flex:1;min-width:180px;padding:8px 12px;border-radius:6px;font-size:0.9rem;">
       <select id="filter-class"
-        style="width:auto;min-width:150px;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;background:white;">
+        style="width:auto;min-width:150px;padding:8px 12px;border-radius:6px;font-size:0.9rem;">
         <option value="">All Classes</option>
         <option value="__none__">No Class</option>
       </select>
       <select id="filter-status"
-        style="width:auto;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;background:white;">
+        style="width:auto;padding:8px 12px;border-radius:6px;font-size:0.9rem;">
         <option value="">All Status</option>
         <option value="registered">Registered</option>
         <option value="pending">Invite Sent</option>
@@ -385,7 +386,7 @@
             <td>${item.grade || '—'}</td>
             <td>
               <select onchange="assignClass('${s.id}', this.value)"
-                style="width:auto;padding:4px 8px;font-size:0.85rem;border:1px solid #ddd;border-radius:4px;background:white;">
+                style="width:auto;padding:4px 8px;font-size:0.85rem;border-radius:4px;">
                 ${classOptions.replace(`value="${s.class_id}"`, `value="${s.class_id}" selected`)}
               </select>
             </td>

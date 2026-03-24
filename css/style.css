@@ -442,7 +442,14 @@ tbody tr:last-child td {
 }
 
 /* ─── Dark Mode ─────────────────────────────────────────── */
+[data-theme="dark"] select {
+  background: #1a2537;
+  color: #d0e4f5;
+  border-color: rgba(125,180,232,0.2);
+}
+
 [data-theme="dark"] {
+  color-scheme: dark;
   --surface:              #111827;
   --surface-low:          #1a2537;
   --surface-high:         #243447;

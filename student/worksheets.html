@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Worksheets</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    /* ── Worksheet selector ─────────────────────────────────── */
+    .ws-selector {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+    }
+    .ws-tab {
+      padding: 10px 22px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(64,97,137,0.2);
+      background: var(--surface-card);
+      color: var(--on-surface-variant);
+      font-size: 0.9rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition), border-color var(--transition);
+    }
+    .ws-tab:hover { border-color: var(--primary); color: var(--primary); }
+    .ws-tab.active {
+      background: var(--primary);
+      color: var(--on-primary);
+      border-color: var(--primary);
+    }
+
+    /* ── Progress bar ───────────────────────────────────────── */
+    .ws-progress {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .progress-track {
+      flex: 1;
+      height: 6px;
+      background: var(--surface-high);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 99px;
+      transition: width 0.4s ease;
+    }
+    .progress-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--on-surface-variant);
+      white-space: nowrap;
+    }
+
+    /* ── Problem grid ───────────────────────────────────────── */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    /* ── Problem card ───────────────────────────────────────── */
+    .problem-card {
+      background: var(--surface-card);
+      border: 1px solid rgba(64,97,137,0.12);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .problem-card.card-correct {
+      border-color: var(--on-secondary-container);
+      background: var(--secondary-container);
+    }
+    .problem-card.card-wrong {
+      border-color: var(--error);
+      background: var(--error-container);
+    }
+    .problem-number {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--on-surface-variant);
+    }
+    .problem-given {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .problem-given li {
+      font-size: 0.875rem;
+      color: var(--on-surface);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .problem-given li::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--primary-container);
+      flex-shrink: 0;
+    }
+    .problem-find {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--on-surface);
+    }
+    .problem-find span {
+      font-weight: 400;
+      color: var(--on-surface-variant);
+    }
+
+    /* ── Answer row ─────────────────────────────────────────── */
+    .answer-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .answer-input {
+      width: 110px;
+      padding: 9px 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(64,97,137,0.2);
+      background: var(--surface-low);
+      color: var(--on-surface);
+      font-size: 0.95rem;
+      font-family: 'Manrope', sans-serif;
+      font-weight: 600;
+      transition: border-color var(--transition);
+      text-align: center;
+    }
+    .answer-input:focus { outline: none; border-color: var(--primary); }
+    .answer-input:disabled { opacity: 0.7; cursor: default; }
+    .answer-unit {
+      font-size: 0.9rem;
+      color: var(--on-surface-variant);
+      font-weight: 500;
+    }
+    .check-btn {
+      padding: 9px 18px;
+      border-radius: var(--radius-md);
+      border: none;
+      background: var(--primary);
+      color: var(--on-primary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: background var(--transition);
+      white-space: nowrap;
+    }
+    .check-btn:hover:not(:disabled) { background: var(--primary-dim); }
+    .check-btn:disabled { opacity: 0.5; cursor: default; }
+
+    /* ── Feedback ───────────────────────────────────────────── */
+    .feedback {
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .feedback.correct { color: var(--on-secondary-container); }
+    .feedback.wrong   { color: var(--error); }
+
+    /* ── Hint ───────────────────────────────────────────────── */
+    .hint-row { display: flex; align-items: center; justify-content: space-between; }
+    .hint-btn {
+      background: none;
+      border: none;
+      font-size: 0.78rem;
+      color: var(--on-surface-variant);
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      padding: 0;
+      transition: color var(--transition);
+    }
+    .hint-btn:hover { color: var(--primary); }
+    .hint-text {
+      font-size: 0.82rem;
+      color: var(--on-surface-variant);
+      font-style: italic;
+      background: var(--surface-low);
+      padding: 7px 12px;
+      border-radius: var(--radius-sm);
+      font-family: 'Manrope', sans-serif;
+    }
+
+    /* ── Score summary ──────────────────────────────────────── */
+    .score-summary {
+      margin-top: 32px;
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      text-align: center;
+      border: 1px solid rgba(64,97,137,0.12);
+    }
+    .score-big {
+      font-family: 'Manrope', sans-serif;
+      font-size: 3rem;
+      font-weight: 800;
+      color: var(--primary);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    .score-sub { font-size: 0.9rem; color: var(--on-surface-variant); }
+    .reset-btn {
+      margin-top: 20px;
+      padding: 10px 24px;
+      border-radius: var(--radius-md);
+      border: none;
+      background: var(--surface-high);
+      color: var(--on-surface-variant);
+      font-size: 0.875rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: background var(--transition);
+    }
+    .reset-btn:hover { background: var(--primary-container); color: var(--on-primary-container); }
+  </style>
+</head>
+<body>
+
+  <nav class="sidebar">
+    <div class="sidebar-brand">Boring Boxes</div>
+    <div class="sidebar-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="results.html">My Results</a>
+      <a href="socratic.html">Socratic Trainer</a>
+      <a href="worksheets.html">Worksheets</a>
+      <a href="profile.html">Profile</a>
+    </div>
+    <div class="sidebar-footer">
+      <div id="nav-user-info" class="sidebar-user"></div>
+      <button id="logout-btn" class="btn-sign-out">Sign Out</button>
+    </div>
+  </nav>
+  <script>(function(){const f=location.pathname.split('/').pop();document.querySelectorAll('.sidebar-links a').forEach(a=>{if(a.getAttribute('href')===f)a.classList.add('active')})})()</script>
+
+  <div class="page" style="max-width:900px;">
+
+    <div style="margin-bottom:28px;">
+      <h2 style="margin-bottom:6px;">Worksheets</h2>
+      <p style="color:var(--on-surface-variant);font-size:0.9rem;">
+        Work through each problem, enter your answer, and check it against the answer key.
+        Use the hint button if you get stuck.
+      </p>
+    </div>
+
+    <!-- Worksheet selector -->
+    <div class="ws-selector" id="ws-selector"></div>
+
+    <!-- Progress -->
+    <div class="ws-progress">
+      <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      <span class="progress-label" id="progress-label">0 / 10</span>
+    </div>
+
+    <!-- Problems -->
+    <div class="problem-grid" id="problem-grid"></div>
+
+    <!-- Score summary (hidden until all answered) -->
+    <div class="score-summary hidden" id="score-summary">
+      <div class="score-big" id="score-big"></div>
+      <p class="score-sub" id="score-sub"></p>
+      <button class="reset-btn" id="reset-btn">Try Again</button>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { requireAuth, logout } from '../js/auth.js'
+    import { WORKSHEETS } from '../js/worksheet-data.js'
+
+    const { user, profile } = await requireAuth('student')
+    document.getElementById('logout-btn').addEventListener('click', logout)
+    document.getElementById('nav-user-info').textContent = 'Student: ' + (profile.full_name || user.email)
+
+    // ── State ─────────────────────────────────────────────────
+    let activeKey     = 'trig_a'
+    let answers       = {}   // problemId → { value, correct }
+    let hintsShown    = new Set()
+
+    const SIDE_TOL  = 0.5
+    const ANGLE_TOL = 1.0
+
+    // ── Worksheet selector tabs ───────────────────────────────
+    const selectorEl = document.getElementById('ws-selector')
+    Object.values(WORKSHEETS).forEach(ws => {
+      const btn = document.createElement('button')
+      btn.className = 'ws-tab' + (ws.id === activeKey ? ' active' : '')
+      btn.textContent = ws.title
+      btn.addEventListener('click', () => {
+        activeKey = ws.id
+        answers = {}
+        hintsShown = new Set()
+        document.querySelectorAll('.ws-tab').forEach(b => b.classList.toggle('active', b.textContent === ws.title))
+        render()
+      })
+      selectorEl.appendChild(btn)
+    })
+
+    // ── Render triangle SVG ───────────────────────────────────
+    function renderTriangle(tri) {
+      if (!tri) return ''
+      const { pts, rightAt, sides = [], angles = [] } = tri
+      const p = pts
+
+      const pathD = `M${p.a[0]},${p.a[1]} L${p.b[0]},${p.b[1]} L${p.c[0]},${p.c[1]} Z`
+
+      // Right-angle square marker
+      const rv = p[rightAt]
+      const other = ['a','b','c'].filter(k => k !== rightAt)
+      const e1 = p[other[0]], e2 = p[other[1]]
+      function unit(from, to) {
+        const dx = to[0] - from[0], dy = to[1] - from[1]
+        const len = Math.sqrt(dx*dx + dy*dy)
+        return [dx/len, dy/len]
+      }
+      const sq = 9
+      const u1 = unit(rv, e1), u2 = unit(rv, e2)
+      const corners = [
+        rv,
+        [rv[0] + sq*u1[0], rv[1] + sq*u1[1]],
+        [rv[0] + sq*u1[0] + sq*u2[0], rv[1] + sq*u1[1] + sq*u2[1]],
+        [rv[0] + sq*u2[0], rv[1] + sq*u2[1]],
+      ]
+      const sqPath = corners.map((c, i) => `${i===0?'M':'L'}${c[0].toFixed(1)},${c[1].toFixed(1)}`).join(' ') + ' Z'
+
+      // Side labels
+      const sideLabels = sides.map(sl => {
+        const mx = (p[sl.v1][0] + p[sl.v2][0]) / 2 + sl.dx
+        const my = (p[sl.v1][1] + p[sl.v2][1]) / 2 + sl.dy
+        const unknown = sl.text === 'x' || sl.text === 'θ'
+        return `<text x="${mx.toFixed(1)}" y="${my.toFixed(1)}" text-anchor="middle" dominant-baseline="middle"
+          fill="${unknown ? 'var(--primary)' : 'var(--on-surface)'}"
+          font-size="11" font-weight="${unknown ? '700' : '500'}"
+          font-family="Manrope,sans-serif">${sl.text}</text>`
+      }).join('')
+
+      // Angle labels
+      const angleLabels = angles.map(al => {
+        const ax = p[al.v][0] + al.dx, ay = p[al.v][1] + al.dy
+        const unknown = al.text === 'θ'
+        return `<text x="${ax.toFixed(1)}" y="${ay.toFixed(1)}" text-anchor="middle" dominant-baseline="middle"
+          fill="${unknown ? 'var(--primary)' : 'var(--on-surface-variant)'}"
+          font-size="11" font-weight="${unknown ? '700' : '500'}"
+          font-style="${unknown ? 'normal' : 'italic'}"
+          font-family="Manrope,sans-serif">${al.text}</text>`
+      }).join('')
+
+      return `<svg viewBox="0 0 180 130" width="100%" style="max-height:110px;display:block;">
+        <path d="${pathD}" fill="var(--primary-container)" stroke="var(--primary)" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="${sqPath}" fill="none" stroke="var(--primary)" stroke-width="1.2"/>
+        ${sideLabels}
+        ${angleLabels}
+      </svg>`
+    }
+
+    // ── Validate answer ───────────────────────────────────────
+    function isCorrect(problem, raw) {
+      const val = parseFloat(raw)
+      if (isNaN(val)) return false
+      const tol = problem.answerType === 'angle' ? ANGLE_TOL : SIDE_TOL
+      return Math.abs(val - problem.answer) <= tol
+    }
+
+    // ── Update progress ───────────────────────────────────────
+    function updateProgress(problems) {
+      const total     = problems.length
+      const attempted = Object.keys(answers).length
+      const correct   = Object.values(answers).filter(a => a.correct).length
+      const pct       = Math.round((attempted / total) * 100)
+
+      document.getElementById('progress-fill').style.width = pct + '%'
+      document.getElementById('progress-label').textContent = `${attempted} / ${total} answered`
+
+      if (attempted === total) {
+        const summaryEl = document.getElementById('score-summary')
+        summaryEl.classList.remove('hidden')
+        document.getElementById('score-big').textContent = `${correct}/${total}`
+        const pctScore = Math.round((correct / total) * 100)
+        document.getElementById('score-sub').textContent =
+          `${pctScore}% — ${pctScore >= 80 ? 'Great work!' : pctScore >= 60 ? 'Good effort!' : 'Keep practising!'}`
+        const color = pctScore >= 80 ? 'var(--on-secondary-container)' : pctScore >= 60 ? 'var(--tertiary)' : 'var(--error)'
+        document.getElementById('score-big').style.color = color
+      } else {
+        document.getElementById('score-summary').classList.add('hidden')
+      }
+    }
+
+    // ── Render ────────────────────────────────────────────────
+    function render() {
+      const ws       = WORKSHEETS[activeKey]
+      const grid     = document.getElementById('problem-grid')
+      updateProgress(ws.problems)
+
+      grid.innerHTML = ws.problems.map(p => {
+        const state   = answers[p.id]
+        const checked = !!state
+        const correct = state?.correct ?? false
+        const cardCls = checked ? (correct ? 'card-correct' : 'card-wrong') : ''
+        const hintVisible = hintsShown.has(p.id)
+
+        return `
+          <div class="problem-card ${cardCls}" id="card-${p.id}">
+            <p class="problem-number">Problem ${p.id}</p>
+
+            ${renderTriangle(p.triangle)}
+
+            <ul class="problem-given">
+              ${p.given.map(g => `<li>${g}</li>`).join('')}
+            </ul>
+
+            <p class="problem-find"><span>Find: </span>${p.find}</p>
+
+            <div class="answer-row">
+              <input
+                class="answer-input"
+                type="number"
+                step="any"
+                id="input-${p.id}"
+                placeholder="?"
+                value="${state?.value ?? ''}"
+                ${checked ? 'disabled' : ''}
+              >
+              ${p.unit ? `<span class="answer-unit">${p.unit}</span>` : ''}
+              <button class="check-btn" id="check-${p.id}" ${checked ? 'disabled' : ''} onclick="checkAnswer(${p.id})">
+                Check
+              </button>
+            </div>
+
+            ${checked ? `
+              <p class="feedback ${correct ? 'correct' : 'wrong'}">
+                ${correct
+                  ? '✓ Correct!'
+                  : `✗ Not quite — answer is ${p.answer}${p.unit}`}
+              </p>
+            ` : ''}
+
+            <div class="hint-row">
+              ${!checked ? `
+                <button class="hint-btn" onclick="toggleHint(${p.id})">
+                  ${hintVisible ? 'Hide hint' : 'Show hint'}
+                </button>
+                ${hintVisible ? `<span class="hint-text">${p.hint}</span>` : ''}
+              ` : `
+                <span class="hint-text">${p.hint}</span>
+              `}
+            </div>
+          </div>
+        `
+      }).join('')
+    }
+
+    // ── Check answer ──────────────────────────────────────────
+    window.checkAnswer = function(id) {
+      const ws      = WORKSHEETS[activeKey]
+      const problem = ws.problems.find(p => p.id === id)
+      const raw     = document.getElementById(`input-${id}`).value
+      if (!raw.trim()) return
+      answers[id] = { value: raw, correct: isCorrect(problem, raw) }
+      render()
+    }
+
+    // ── Toggle hint ───────────────────────────────────────────
+    window.toggleHint = function(id) {
+      if (hintsShown.has(id)) hintsShown.delete(id)
+      else hintsShown.add(id)
+      render()
+    }
+
+    // ── Reset ─────────────────────────────────────────────────
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      answers   = {}
+      hintsShown = new Set()
+      render()
+    })
+
+    // ── Allow Enter key to submit ──────────────────────────────
+    document.getElementById('problem-grid').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.target.classList.contains('answer-input')) {
+        const id = parseInt(e.target.id.replace('input-', ''))
+        checkAnswer(id)
+      }
+    })
+
+    render()
+  </script>
+  <script src="../js/nav.js"></script>
+</body>
+</html>

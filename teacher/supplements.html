@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory Work Supplements</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    /* ── Filter bar ─────────────────────────────────────────── */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .filter-bar select {
+      width: auto;
+      padding: 8px 12px;
+      font-size: 0.875rem;
+      border-radius: var(--radius-md);
+    }
+    .filter-price-group {
+      display: flex;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid rgba(64,97,137,0.2);
+    }
+    .filter-price-btn {
+      padding: 8px 16px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      background: var(--surface-card);
+      color: var(--on-surface-variant);
+      border: none;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      transition: background var(--transition), color var(--transition);
+    }
+    .filter-price-btn + .filter-price-btn {
+      border-left: 1px solid rgba(64,97,137,0.2);
+    }
+    .filter-price-btn.active {
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+      font-weight: 600;
+    }
+
+    /* ── Results meta ───────────────────────────────────────── */
+    .results-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      font-size: 0.85rem;
+      color: var(--on-surface-variant);
+    }
+    .clear-filters-btn {
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      padding: 0;
+    }
+    .clear-filters-btn:hover { text-decoration: underline; }
+
+    /* ── Resource cards grid ────────────────────────────────── */
+    .supplements-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .supplement-card {
+      background: var(--surface-card);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      border: 1px solid rgba(64,97,137,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: box-shadow var(--transition), border-color var(--transition);
+    }
+    .supplement-card:hover {
+      box-shadow: 0 4px 16px rgba(60,96,145,0.1);
+      border-color: rgba(64,97,137,0.25);
+    }
+    .card-badges {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-type-flashcards { background: var(--primary-container); color: var(--on-primary-container); }
+    .badge-type-worksheets { background: var(--tertiary-container); color: var(--tertiary); }
+    .badge-type-games      { background: var(--secondary-container); color: var(--on-secondary-container); }
+    .badge-free  { background: var(--secondary-container); color: var(--on-secondary-container); }
+    .badge-paid  { background: var(--surface-high); color: var(--on-surface-variant); }
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--on-surface);
+      line-height: 1.4;
+    }
+    .card-meta {
+      font-size: 0.8rem;
+      color: var(--on-surface-variant);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .card-meta-dot { opacity: 0.4; }
+    .card-source {
+      font-size: 0.78rem;
+      color: var(--on-surface-variant);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .source-icon { opacity: 0.5; flex-shrink: 0; }
+    .card-actions { margin-top: auto; }
+    .btn-visit {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 18px;
+      border-radius: var(--radius-md);
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      background: var(--primary);
+      color: var(--on-primary);
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background var(--transition);
+    }
+    .btn-visit:hover { background: var(--primary-dim); }
+
+    /* ── TPT banner ─────────────────────────────────────────── */
+    .tpt-banner {
+      background: var(--surface-card);
+      border: 1px solid rgba(64,97,137,0.15);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+    .tpt-banner-text { flex: 1; min-width: 200px; }
+    .tpt-banner-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--on-surface-variant);
+      margin-bottom: 4px;
+    }
+    .tpt-banner-title {
+      font-size: 0.975rem;
+      font-weight: 600;
+      color: var(--on-surface);
+      margin-bottom: 4px;
+    }
+    .tpt-banner-desc {
+      font-size: 0.82rem;
+      color: var(--on-surface-variant);
+      line-height: 1.5;
+    }
+
+    /* ── Empty state ────────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--on-surface-variant);
+    }
+    .empty-state p { font-size: 0.9rem; margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+  <nav class="sidebar">
+    <div class="sidebar-brand">Boring Boxes</div>
+    <div class="sidebar-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="students.html">Students</a>
+      <a href="tests.html">My Tests</a>
+      <a href="catalogue.html">Catalogue</a>
+      <a href="results.html">Results</a>
+      <a href="socratic.html">Socratic</a>
+      <a href="supplements.html">Supplements</a>
+      <a href="profile.html">Profile</a>
+    </div>
+    <div class="sidebar-footer">
+      <div id="nav-user-info" class="sidebar-user"></div>
+      <button id="logout-btn" class="btn-sign-out">Sign Out</button>
+    </div>
+  </nav>
+  <script>(function(){const f=location.pathname.split('/').pop();document.querySelectorAll('.sidebar-links a').forEach(a=>{if(a.getAttribute('href')===f)a.classList.add('active')})})()</script>
+
+  <div class="page">
+
+    <div style="margin-bottom:28px;">
+      <h2 style="margin-bottom:6px;">Memory Work Supplements</h2>
+      <p style="color:var(--on-surface-variant);font-size:0.9rem;max-width:600px;line-height:1.65;">
+        Cycle-specific flashcards, worksheets, and digital games that align with weekly grammar, history sentences, timeline cards, Latin, math, science, and geography.
+      </p>
+    </div>
+
+    <!-- TPT Banner -->
+    <div class="tpt-banner">
+      <div class="tpt-banner-text">
+        <p class="tpt-banner-label">External Resource</p>
+        <p class="tpt-banner-title">Find more on Teachers Pay Teachers</p>
+        <p class="tpt-banner-desc">Search thousands of CC-aligned resources by cycle, week, and subject from independent creators.</p>
+      </div>
+      <a id="tpt-search-link" href="https://www.teacherspayteachers.com/Browse/Search:classical+conversations" target="_blank" rel="noopener" class="btn-visit">
+        Search TPT
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+      </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-bar">
+      <select id="filter-cycle">
+        <option value="">All Cycles</option>
+        <option value="1">Cycle 1</option>
+        <option value="2">Cycle 2</option>
+        <option value="3">Cycle 3</option>
+      </select>
+      <select id="filter-week">
+        <option value="">All Weeks</option>
+      </select>
+      <select id="filter-subject">
+        <option value="">All Subjects</option>
+        <option>Grammar</option>
+        <option>History</option>
+        <option>Timeline</option>
+        <option>Latin</option>
+        <option>Math</option>
+        <option>Science</option>
+        <option>Geography</option>
+      </select>
+      <select id="filter-type">
+        <option value="">All Types</option>
+        <option>Flashcards</option>
+        <option>Worksheets</option>
+        <option>Digital Games</option>
+      </select>
+      <div class="filter-price-group">
+        <button class="filter-price-btn active" data-price="">All</button>
+        <button class="filter-price-btn" data-price="free">Free</button>
+        <button class="filter-price-btn" data-price="paid">Paid</button>
+      </div>
+    </div>
+
+    <!-- Results meta -->
+    <div class="results-meta">
+      <span id="results-count"></span>
+      <button class="clear-filters-btn hidden" id="clear-filters-btn">Clear filters</button>
+    </div>
+
+    <!-- Cards -->
+    <div class="supplements-grid" id="supplements-grid"></div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="empty-state hidden">
+      <strong>No resources found</strong>
+      <p>Try adjusting your filters, or search Teachers Pay Teachers for more options.</p>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { requireAuth, logout } from '../js/auth.js'
+    import { supabase } from '../js/supabase.js'
+    import { SUPPLEMENTS, SUBJECTS, TYPES } from '../js/supplements-data.js'
+
+    const { user, profile } = await requireAuth('teacher')
+    document.getElementById('logout-btn').addEventListener('click', logout)
+
+    const { data: school } = await supabase
+      .from('schools').select('id, name').eq('teacher_id', user.id).maybeSingle()
+    document.getElementById('nav-user-info').textContent =
+      `Teacher: ${profile.full_name} · ${school?.name || ''}`
+
+    // ── Populate week filter ───────────────────────────────────
+    const weekSel = document.getElementById('filter-week')
+    for (let w = 1; w <= 24; w++) {
+      const opt = document.createElement('option')
+      opt.value = w; opt.textContent = `Week ${w}`
+      weekSel.appendChild(opt)
+    }
+
+    // ── Filter state ──────────────────────────────────────────
+    const filters = { cycle: '', week: '', subject: '', type: '', price: '' }
+
+    // ── Price toggle ──────────────────────────────────────────
+    document.querySelectorAll('.filter-price-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-price-btn').forEach(b => b.classList.remove('active'))
+        btn.classList.add('active')
+        filters.price = btn.dataset.price
+        render()
+      })
+    })
+
+    // ── Select filters ────────────────────────────────────────
+    document.getElementById('filter-cycle').addEventListener('change', e => { filters.cycle = e.target.value; updateTPTLink(); render() })
+    document.getElementById('filter-week').addEventListener('change',  e => { filters.week  = e.target.value; updateTPTLink(); render() })
+    document.getElementById('filter-subject').addEventListener('change', e => { filters.subject = e.target.value; updateTPTLink(); render() })
+    document.getElementById('filter-type').addEventListener('change',   e => { filters.type    = e.target.value; render() })
+
+    // ── Clear filters ─────────────────────────────────────────
+    document.getElementById('clear-filters-btn').addEventListener('click', () => {
+      filters.cycle = ''; filters.week = ''; filters.subject = ''; filters.type = ''; filters.price = ''
+      document.getElementById('filter-cycle').value   = ''
+      document.getElementById('filter-week').value    = ''
+      document.getElementById('filter-subject').value = ''
+      document.getElementById('filter-type').value    = ''
+      document.querySelectorAll('.filter-price-btn').forEach(b => b.classList.toggle('active', b.dataset.price === ''))
+      updateTPTLink()
+      render()
+    })
+
+    // ── TPT deep link ─────────────────────────────────────────
+    function updateTPTLink() {
+      const parts = ['classical conversations']
+      if (filters.cycle)   parts.push(`cycle ${filters.cycle}`)
+      if (filters.week)    parts.push(`week ${filters.week}`)
+      if (filters.subject) parts.push(filters.subject.toLowerCase())
+      const query = parts.join(' ').replace(/\s+/g, '+')
+      document.getElementById('tpt-search-link').href =
+        `https://www.teacherspayteachers.com/Browse/Search:${query}`
+    }
+
+    // ── Badge helpers ─────────────────────────────────────────
+    function typeBadgeClass(type) {
+      if (type === 'Flashcards')   return 'badge-type-flashcards'
+      if (type === 'Worksheets')   return 'badge-type-worksheets'
+      if (type === 'Digital Games') return 'badge-type-games'
+      return ''
+    }
+
+    function sourceIcon(source) {
+      if (source === 'Boom Learning') return `<svg class="source-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`
+      if (source === 'Free Download') return `<svg class="source-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`
+      return `<svg class="source-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`
+    }
+
+    // ── Render ────────────────────────────────────────────────
+    function render() {
+      const filtered = SUPPLEMENTS.filter(r => {
+        if (filters.cycle   && r.cycle !== parseInt(filters.cycle)) return false
+        if (filters.week    && r.week !== null && r.week !== parseInt(filters.week)) return false
+        if (filters.subject && r.subject !== filters.subject) return false
+        if (filters.type    && r.type !== filters.type) return false
+        if (filters.price   && r.price !== filters.price) return false
+        return true
+      })
+
+      const hasFilters = Object.values(filters).some(v => v !== '')
+      document.getElementById('clear-filters-btn').classList.toggle('hidden', !hasFilters)
+      document.getElementById('results-count').textContent =
+        `${filtered.length} resource${filtered.length !== 1 ? 's' : ''}`
+
+      const grid = document.getElementById('supplements-grid')
+      const empty = document.getElementById('empty-state')
+
+      if (!filtered.length) {
+        grid.innerHTML = ''
+        empty.classList.remove('hidden')
+        return
+      }
+      empty.classList.add('hidden')
+
+      grid.innerHTML = filtered.map(r => {
+        const weekLabel = r.week ? `Week ${r.week}` : 'All Weeks'
+        return `
+          <div class="supplement-card">
+            <div class="card-badges">
+              <span class="badge ${typeBadgeClass(r.type)}">${r.type}</span>
+              <span class="badge ${r.price === 'free' ? 'badge-free' : 'badge-paid'}">${r.price === 'free' ? 'Free' : 'Paid'}</span>
+            </div>
+            <p class="card-title">${r.title}</p>
+            <div class="card-meta">
+              <span>${r.subject}</span>
+              <span class="card-meta-dot">·</span>
+              <span>Cycle ${r.cycle}</span>
+              <span class="card-meta-dot">·</span>
+              <span>${weekLabel}</span>
+            </div>
+            <div class="card-source">
+              ${sourceIcon(r.source)}
+              <span>${r.source}</span>
+            </div>
+            <div class="card-actions">
+              <a href="${r.url}" target="_blank" rel="noopener" class="btn-visit">
+                ${r.source === 'Free Download' ? 'Download' : 'Visit Resource'}
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+              </a>
+            </div>
+          </div>
+        `
+      }).join('')
+    }
+
+    render()
+  </script>
+  <script src="../js/nav.js"></script>
+</body>
+</html>

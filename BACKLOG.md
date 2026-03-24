@@ -29,12 +29,20 @@
 
 ## Features
 
+- [ ] **Passkey authentication for teachers** — Add passkey (WebAuthn) enrollment on the teacher profile page and a "Sign in with passkey" option on the login page. Teachers only (students use magic link OTP). No phone numbers or third-party services needed — Supabase supports WebAuthn natively.
+
 - [ ] **Post-catalogue-copy link** — After a teacher copies a catalogue test to their own tests, show a link/button to navigate directly to the new copy.
 - [ ] **Admin page** — Dedicated admin area to manage who can add tests to the catalogue. Needs a new role/permission model.
 - [ ] **Practice test mode** — Students can take a test in practice mode: no score recorded, answers revealed after each question or at the end, can retake freely.
 - [x] **Add favicon** — Add a favicon to all pages.
 
+## Features
+
+- [x] **Memory Work Supplements page** — Browsable, filterable resource library for CC-aligned flashcards, worksheets, and digital games. Filters by cycle, week, subject, type, and free/paid. TPT deep-link banner updates dynamically based on active filters. Added to teacher sidebar.
+
 ## UX / Polish
 
+- [ ] **Supabase email templates** — Redesign the auth email templates (magic link, invite, password reset, email change confirmation) in the Supabase dashboard to match the Boring Boxes brand. On-brand typography, colours, and copy.
+
 - [x] **Scroll to new question** — After clicking "Add Question" in the test editor, the page should scroll down to the newly added question.
-- [ ] **Socratic dialogue chat UI** — Redesign the Socratic dialogue as a conversation with chat bubbles. Socrates and Meno should have cartoon character avatars shown next to their messages. Each speaker's bubbles should be visually distinct (alignment, colour). Applies to both the student Socratic page and the teacher Socratic trainer.
+- [x] **Socratic dialogue chat UI** — Redesign the Socratic dialogue as a conversation with chat bubbles. Socrates and Meno should have cartoon character avatars shown next to their messages. Each speaker's bubbles should be visually distinct (alignment, colour). Applies to both the student Socratic page and the teacher Socratic trainer.
